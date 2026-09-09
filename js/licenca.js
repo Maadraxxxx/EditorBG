@@ -19,10 +19,20 @@ export const PRECO = 'R$ 19,90';
 export const TEXTO_PLANO = 'pagamento único, acesso vitalício';
 
 /**
- * Funções serverless. A cobrança é criada na hora, amarrada à conta de quem
- * compra — é isso que permite o webhook liberar o VIP sozinho depois.
+ * Chave pública do Mercado Pago, usada pelo Payment Brick no navegador.
+ * É pública por design (Painel > sua aplicação > Credenciais). O Access Token,
+ * esse sim secreto, vive só nas variáveis de ambiente do servidor.
  */
-export const ENDPOINT_PAGAMENTO = '/api/criar-pagamento';
+export const MP_PUBLIC_KEY = '';   // ex.: 'APP_USR-0000...' ou 'TEST-0000...'
+
+/** Valor cobrado. O servidor tem o seu próprio (PRECO_VIP) e é ele que vale. */
+export const VALOR_VIP = 19.90;
+
+/**
+ * Funções serverless. O pagamento nasce amarrado à conta de quem compra — é
+ * isso que permite o webhook liberar o VIP sozinho depois.
+ */
+export const ENDPOINT_PAGAR = '/api/pagar';
 export const ENDPOINT_VALIDACAO = '/api/validar';   // conferência manual, só como plano B
 
 /* ------------------------------------------------------------------ *

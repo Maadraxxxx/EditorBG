@@ -3,7 +3,8 @@
  * Compartilhada pelas duas páginas — o markup vem de partials/editor.html.
  */
 import {
-  REDUCAO_GRATIS, PRECO, TEXTO_PLANO, ENDPOINT_PAGAMENTO, ENDPOINT_VALIDACAO,
+  REDUCAO_GRATIS, PRECO, TEXTO_PLANO, ENDPOINT_PAGAR, ENDPOINT_VALIDACAO,
+  MP_PUBLIC_KEY, VALOR_VIP,
   aplicarLimite,
 } from './licenca.js';
 import * as Conta from './conta.js';
@@ -81,6 +82,8 @@ export function abrirPaywall(canvas, nome) {
   const logado = !Conta.CONFIGURADO || Conta.estaLogado();
   $('hdEntrar').hidden = logado;
   $('hdPagar').hidden = !logado;
+  $('hdBrick').hidden = true;
+  $('hdPix').hidden = true;
   $('hdCodigo').closest('.hd-codigo').hidden = !logado;
 
   modal.hidden = false;
@@ -89,6 +92,11 @@ export function abrirPaywall(canvas, nome) {
 function fechar() {
   modal.hidden = true;
   canvasPendente = null;
+  if (brick) { try { brick.unmount(); } catch { /* ja foi */ } brick = null; }
+  $('hdBrick').hidden = true;
+  $('hdBrick').innerHTML = '';
+  $('hdPix').hidden = true;
+  $('hdPagar').hidden = false;
 }
 
 $('hdFechar').addEventListener('click', fechar);
@@ -156,53 +164,164 @@ $('hdEntrar').addEventListener('click', () => {
   document.dispatchEvent(new CustomEvent('abrir-conta'));
 });
 
+/* ------------------------------------------------------------------ *
+ * Checkout Bricks
+ * ------------------------------------------------------------------ */
+
+/** Carrega o SDK do Mercado Pago uma vez, so quando alguem vai pagar. */
+let sdkCarregando = null;
+
+function carregarSdk() {
+  if (window.MercadoPago) return Promise.resolve();
+  if (sdkCarregando) return sdkCarregando;
+
+  sdkCarregando = new Promise((resolve, reject) => {
+    const tag = document.createElement('script');
+    tag.src = 'https://sdk.mercadopago.com/js/v2';
+    tag.onload = resolve;
+    tag.onerror = () => reject(new Error('N\u00e3o foi poss\u00edvel carregar o Mercado Pago.'));
+    document.head.appendChild(tag);
+  });
+  return sdkCarregando;
+}
+
+let brick = null;
+
 /**
- * Abre o checkout com a cobranca ja amarrada a esta conta. E essa amarracao que
- * permite o webhook liberar o VIP sozinho depois, sem ninguem digitar codigo.
+ * Monta o formulario de pagamento dentro do modal. O cartao e tokenizado pelo
+ * proprio SDK e nunca passa pelo nosso servidor; o que sai daqui e um token.
  */
-$('hdPagar').addEventListener('click', async (e) => {
-  e.preventDefault();
+async function abrirFormularioDePagamento() {
   if (!Conta.estaLogado()) {
-    aviso.textContent = 'Entre na sua conta antes de pagar.';
-    aviso.className = 'hd-aviso erro';
+    mostrarAviso('Entre na sua conta antes de pagar.', 'erro');
+    return;
+  }
+  if (!MP_PUBLIC_KEY) {
+    mostrarAviso('O pagamento ainda n\u00e3o foi configurado neste site.', 'erro');
     return;
   }
 
-  const rotulo = $('hdPagar').textContent;
-  $('hdPagar').textContent = 'Abrindo o pagamento\u2026';
-  aviso.textContent = '';
-  aviso.className = 'hd-aviso';
+  $('hdPagar').disabled = true;
+  mostrarAviso('Carregando o pagamento\u2026');
 
   try {
-    const r = await fetch(ENDPOINT_PAGAMENTO, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + Conta.tokenAcesso() },
-    });
-    const dados = await r.json().catch(() => ({}));
-    if (!r.ok || !dados.url) throw new Error(dados.motivo || 'N\u00e3o deu para abrir o pagamento agora.');
+    await carregarSdk();
 
-    window.open(dados.url, '_blank', 'noopener');
-    esperarLiberacao();
+    // Remonta do zero: reabrir o modal com um Brick velho deixa a tela morta.
+    if (brick) { try { brick.unmount(); } catch { /* ja foi */ } brick = null; }
+    $('hdBrick').innerHTML = '';
+    $('hdBrick').hidden = false;
+    $('hdPagar').hidden = true;
+
+    const mp = new window.MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+    brick = await mp.bricks().create('payment', 'hdBrick', {
+      initialization: {
+        amount: VALOR_VIP,
+        payer: { email: Conta.usuario().email },
+      },
+      customization: {
+        paymentMethods: {
+          creditCard: 'all',
+          debitCard: 'all',
+          bankTransfer: 'all',    // Pix
+        },
+        visual: { style: { theme: 'default' } },
+      },
+      callbacks: {
+        onReady: () => mostrarAviso(''),
+        onError: (erro) => {
+          console.error('Brick:', erro);
+          mostrarAviso('Erro no formul\u00e1rio de pagamento. Tente de novo.', 'erro');
+        },
+        onSubmit: ({ formData }) => enviarPagamento(formData),
+      },
+    });
   } catch (err) {
-    aviso.textContent = err.message;
-    aviso.className = 'hd-aviso erro';
+    console.error(err);
+    mostrarAviso(err.message, 'erro');
+    $('hdBrick').hidden = true;
+    $('hdPagar').hidden = false;
   } finally {
-    $('hdPagar').textContent = rotulo;
+    $('hdPagar').disabled = false;
+  }
+}
+
+/** Manda o que o Brick coletou para o servidor, que cria o pagamento. */
+async function enviarPagamento(formData) {
+  mostrarAviso('Processando o pagamento\u2026');
+
+  const r = await fetch(ENDPOINT_PAGAR, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + Conta.tokenAcesso(),
+    },
+    body: JSON.stringify({ formData }),
+  });
+  const dados = await r.json().catch(() => ({}));
+
+  if (!r.ok || !dados.ok) {
+    mostrarAviso(dados.motivo || 'N\u00e3o foi poss\u00edvel processar o pagamento.', 'erro');
+    throw new Error(dados.motivo || 'falha');   // mantem o Brick aberto para tentar de novo
+  }
+
+  tratarResultado(dados);
+}
+
+function tratarResultado(dados) {
+  if (dados.status === 'approved') {
+    mostrarAviso('Pagamento aprovado. Liberando o VIP\u2026', 'ok');
+    esperarLiberacao();
+    return;
+  }
+
+  if (dados.pix && dados.pix.qrBase64) {
+    $('hdBrick').hidden = true;
+    $('hdPix').hidden = false;
+    $('hdPixQr').src = 'data:image/png;base64,' + dados.pix.qrBase64;
+    $('hdPixCopiar').dataset.codigo = dados.pix.copiaECola || '';
+    mostrarAviso('');
+    esperarLiberacao();
+    return;
+  }
+
+  if (dados.status === 'rejected') {
+    mostrarAviso('Pagamento recusado' + (dados.detalhe ? ' (' + dados.detalhe + ')' : '') +
+      '. Tente outro meio de pagamento.', 'erro');
+    return;
+  }
+
+  mostrarAviso('Pagamento em an\u00e1lise. O VIP libera assim que for aprovado.');
+  esperarLiberacao();
+}
+
+$('hdPixCopiar').addEventListener('click', async (e) => {
+  const codigo = e.currentTarget.dataset.codigo;
+  if (!codigo) return;
+  try {
+    await navigator.clipboard.writeText(codigo);
+    e.currentTarget.textContent = 'C\u00f3digo copiado';
+    setTimeout(() => { e.currentTarget.textContent = 'Copiar c\u00f3digo Pix'; }, 2000);
+  } catch {
+    mostrarAviso('Copie o c\u00f3digo pelo aplicativo do banco lendo o QR.', 'erro');
   }
 });
 
+$('hdPagar').addEventListener('click', abrirFormularioDePagamento);
+
+function mostrarAviso(texto, tipo) {
+  aviso.textContent = texto;
+  aviso.className = 'hd-aviso' + (tipo ? ' ' + tipo : '');
+}
+
 /**
- * Depois de mandar a pessoa para o checkout, fica reperguntando o plano ao
- * banco. Quem escreve la e o webhook, entao isso funciona mesmo se ela pagar
- * pelo celular ou fechar a aba do checkout.
+ * Depois de pagar, fica reperguntando o plano ao banco. Quem escreve la e o
+ * webhook, entao isso funciona mesmo com Pix que so compensa depois.
  */
 let esperando = null;
 
 function esperarLiberacao() {
   if (esperando) return;
-  aviso.textContent = 'Esperando a confirma\u00e7\u00e3o do pagamento\u2026';
-  aviso.className = 'hd-aviso';
-
   let tentativas = 0;
   esperando = setInterval(async () => {
     tentativas++;
@@ -212,12 +331,10 @@ function esperarLiberacao() {
       liberado();
       return;
     }
-    if (tentativas >= 60) {           // ~5 minutos
+    if (tentativas >= 120) {            // ~10 minutos
       clearInterval(esperando);
       esperando = null;
-      aviso.textContent = 'Ainda n\u00e3o recebemos a confirma\u00e7\u00e3o. Pix costuma levar alguns segundos \u2014 ' +
-        'assim que cair, o VIP libera sozinho. Se demorar, cole o c\u00f3digo do pagamento abaixo.';
-      aviso.className = 'hd-aviso';
+      mostrarAviso('Ainda n\u00e3o recebemos a confirma\u00e7\u00e3o. Assim que cair, o VIP libera sozinho.');
     }
   }, 5000);
 }

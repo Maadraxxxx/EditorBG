@@ -1325,3 +1325,25 @@ input[type="range"]:focus-visible { outline: 2px solid var(--accent-2); outline-
 /* recurso VIP ainda não liberado: visível, mas claramente diferente */
 .seg button.e-vip { opacity: .62; }
 .selo-vip.mini { margin-left: 5px; padding: 1px 5px; font-size: 8.5px; }
+
+
+/* ---------- Payment Brick ---------- */
+.hd-brick { margin-top: 6px; text-align: left; }
+/* o Brick traz o próprio tema claro; damos o fundo para ele não flutuar */
+.hd-brick:not([hidden]) {
+  background: #fff;
+  border-radius: 14px;
+  padding: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.hd-pix { margin-top: 16px; text-align: center; }
+.hd-pix-titulo { margin: 0 0 12px; font-size: 13.5px; color: var(--txt); font-weight: 600; }
+.hd-pix img {
+  width: 190px; height: 190px;
+  display: block; margin: 0 auto 14px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px;
+}

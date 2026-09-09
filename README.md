@@ -240,6 +240,8 @@ Vale rodar o verificador sempre que mexer no banco.
    A URL e a chave `anon public` ficam em [js/conta.js](js/conta.js); essa chave é pública por design.
 3. **Vercel** — publique o projeto (aí a pasta `api/` vira funções) e defina as variáveis:
    `MP_ACCESS_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SITE_URL` e `PRECO_VIP`.
+   A **chave publica** do Mercado Pago vai em `MP_PUBLIC_KEY` no
+   [js/licenca.js](js/licenca.js) -- ela e publica por design, roda no navegador.
 4. **Mercado Pago** — em Suas integrações > Webhooks, aponte para `SEU_SITE/api/webhook-mp`
    e marque o evento de **pagamentos**.
 5. Ajuste `PRECO` e `REDUCAO_GRATIS` em [js/licenca.js](js/licenca.js) a gosto.
@@ -247,24 +249,32 @@ Vale rodar o verificador sempre que mexer no banco.
 Enquanto as chaves do Supabase estiverem vazias, o site funciona normalmente — sem botão de conta e
 sempre no plano grátis.
 
-### Fluxo da compra (automatico)
+### Fluxo da compra (Checkout Bricks)
 
 1. Pessoa tenta usar um recurso VIP -> abre a tela do plano.
 2. Sem conta, o botao vira **Entrar para assinar**.
-3. Logada, clicar em pagar chama `api/criar-pagamento.js`, que cria a cobranca no Mercado Pago
-   **amarrada aquela conta** (`external_reference = id do usuario`) e devolve o link do checkout.
-4. Assim que o pagamento e aprovado, o Mercado Pago chama `api/webhook-mp.js`, que confere o
-   pagamento na API deles e grava `vip = true` na conta certa.
-5. O navegador fica reperguntando o plano ao banco e libera sozinho quando aparece.
+3. Logada, **Assinar agora** carrega o SDK do Mercado Pago e monta o Payment Brick
+   dentro do proprio modal. Cartao, debito e Pix, sem sair do site.
+4. O Brick tokeniza o cartao no navegador e manda so o token para
+   [api/pagar.js](api/pagar.js), que cria o pagamento via `POST /v1/payments`
+   com `external_reference = id do usuario`.
+5. **Cartao aprovado**: libera na hora. **Pix**: o pagamento nasce pendente e a
+   tela mostra o QR e o copia-e-cola.
+6. Quando o pagamento e aprovado, o Mercado Pago chama
+   [api/webhook-mp.js](api/webhook-mp.js), que grava `vip = true` na conta certa.
+7. O navegador repergunta o plano a cada 5s e libera sozinho quando aparece.
 
-Ninguem digita codigo. O webhook nao depende do navegador: funciona se a pessoa fechar a aba, pagar
-pelo celular ou o Pix compensar depois.
+Dados de cartao **nunca** passam pelo nosso servidor -- o SDK tokeniza direto
+com o Mercado Pago.
 
-O campo de codigo manual continua existindo, recolhido atras de "Pagou e o VIP nao liberou?", para o
-caso de o webhook falhar. Ele usa `api/validar.js`.
+### Duas coisas que o servidor nao aceita do navegador
 
-Por que um link de pagamento estatico nao serve: ele e o mesmo para todo mundo, entao o webhook nao
-teria como saber de quem foi o pagamento.
+O `api/pagar.js` recebe o formulario do Brick, mas ignora dois campos dele:
+
+- **o valor**, que vem de `PRECO_VIP` no servidor. Sem isso daria para editar
+  `transaction_amount` no console e virar VIP por R$ 0,01.
+- **quem esta comprando**, que sai do token da sessao do Supabase, nao de um
+  campo do formulario.
 
 ### Seguranca do webhook
 

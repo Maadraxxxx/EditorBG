@@ -85,7 +85,19 @@
     <div class="hd-preco"><span id="hdPreco">—</span><small id="hdPlano"></small></div>
 
     <button class="btn primary full" id="hdEntrar" hidden>Entrar para assinar</button>
-    <a class="btn primary full" id="hdPagar" href="#" target="_blank" rel="noopener">Pagar com Pix</a>
+    <button class="btn primary full" id="hdPagar">Assinar agora</button>
+
+    <!-- O Payment Brick do Mercado Pago é montado aqui, sob demanda. -->
+    <div class="hd-brick" id="hdBrick" hidden></div>
+
+    <!-- Pix aprovado na hora não existe: o pagamento nasce pendente e o QR
+         aparece aqui até o webhook confirmar. -->
+    <div class="hd-pix" id="hdPix" hidden>
+      <p class="hd-pix-titulo">Escaneie para pagar</p>
+      <img id="hdPixQr" alt="QR Code do Pix" />
+      <button class="btn ghost full" id="hdPixCopiar">Copiar código Pix</button>
+      <p class="hd-nota">Assim que o pagamento cair, o VIP libera sozinho — pode deixar esta tela aberta.</p>
+    </div>
 
     <p class="hd-aviso" id="hdAviso"></p>
 
