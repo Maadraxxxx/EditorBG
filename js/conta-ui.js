@@ -9,7 +9,9 @@ const $ = (id) => document.getElementById(id);
 const modal = $('modalConta');
 const formulario = $('contaFormulario');
 const logada = $('contaLogada');
+const recuperar = $('contaRecuperar');
 const aviso = $('contaAviso');
+const avisoSenha = $('contaAvisoSenha');
 
 let modo = 'entrar';   // 'entrar' | 'cadastrar'
 
@@ -32,8 +34,18 @@ function encaixarBotao() {
   else alvo.insertBefore(botao, alvo.firstChild);
 }
 
-function pintarBotao({ usuario, vip }) {
+// Quem clicou no link do e-mail não deveria ter de caçar o botão de conta para
+// terminar a troca — o modal se abre sozinho, uma vez só.
+let jaAbriuTroca = false;
+
+function pintarBotao({ usuario, vip, recuperando }) {
   if (!Conta.CONFIGURADO) { botao.hidden = true; return; }
+
+  if (recuperando && !jaAbriuTroca) {
+    jaAbriuTroca = true;
+    abrir();
+  }
+
   botao.hidden = false;
   botao.classList.toggle('is-vip', vip);
   if (!usuario) {
@@ -55,9 +67,25 @@ export function abrir(paraAssinar) {
   aviso.textContent = '';
   aviso.className = 'hd-aviso';
 
+  // A troca de senha tem prioridade sobre tudo. Era exatamente aqui que a
+  // pessoa ficava presa: a sessão do link contava como "logado", então a tela
+  // mostrava o perfil e a troca não tinha por onde aparecer.
+  const trocando = Conta.estaRecuperando();
   const logado = Conta.estaLogado();
-  formulario.hidden = logado;
-  logada.hidden = !logado;
+
+  recuperar.hidden = !trocando;
+  formulario.hidden = trocando || logado;
+  logada.hidden = trocando || !logado;
+
+  if (trocando) {
+    avisoSenha.textContent = '';
+    avisoSenha.className = 'hd-aviso';
+    $('contaSenhaNova').value = '';
+    $('contaSenhaNova2').value = '';
+    modal.hidden = false;
+    $('contaSenhaNova').focus();
+    return;
+  }
 
   if (logado) {
     const u = Conta.usuario();
@@ -125,6 +153,41 @@ $('contaEsqueci').addEventListener('click', async () => {
   }
 });
 
+$('contaSalvarSenha').addEventListener('click', salvarSenha);
+
+// Enter em qualquer um dos dois campos salva — é o que se espera de um
+// formulário de senha, e evita a busca pelo botão.
+for (const id of ['contaSenhaNova', 'contaSenhaNova2']) {
+  $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') salvarSenha(); });
+}
+
+async function salvarSenha() {
+  const nova = $('contaSenhaNova').value;
+  const repetida = $('contaSenhaNova2').value;
+
+  if (nova.length < 6) return mostrarSenha('A senha precisa de pelo menos 6 caracteres.', 'erro');
+  if (nova !== repetida) return mostrarSenha('As duas senhas não são iguais.', 'erro');
+
+  $('contaSalvarSenha').disabled = true;
+  mostrarSenha('Salvando…');
+  try {
+    await Conta.alterarSenha(nova);
+    $('contaSenhaNova').value = '';
+    $('contaSenhaNova2').value = '';
+    mostrarSenha('Senha alterada. É essa que vale a partir de agora.', 'ok');
+    setTimeout(fechar, 1800);
+  } catch (err) {
+    mostrarSenha(err.message, 'erro');
+  } finally {
+    $('contaSalvarSenha').disabled = false;
+  }
+}
+
+$('contaPularSenha').addEventListener('click', () => {
+  Conta.limparRecuperacao();
+  fechar();
+});
+
 $('contaSair').addEventListener('click', async () => {
   await Conta.sair();
   fechar();
@@ -138,6 +201,11 @@ $('contaVerVip').addEventListener('click', () => {
 function mostrar(texto, tipo) {
   aviso.textContent = texto;
   aviso.className = 'hd-aviso' + (tipo ? ' ' + tipo : '');
+}
+
+function mostrarSenha(texto, tipo) {
+  avisoSenha.textContent = texto;
+  avisoSenha.className = 'hd-aviso' + (tipo ? ' ' + tipo : '');
 }
 
 /* ------------------------------------------------------------------ *

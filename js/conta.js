@@ -32,16 +32,51 @@ let perfil = null;
 
 const ouvintes = new Set();
 
+/**
+ * Recuperação de senha.
+ *
+ * O link que chega por e-mail JÁ entra na conta — é assim que o Supabase
+ * funciona, a sessão é o comprovante de que a pessoa abriu a caixa de entrada.
+ * Só que entrar não era o pedido dela: ela quer trocar a senha. Sem marcar de
+ * onde veio essa sessão, a tela mostra "você está logado" e a troca nunca
+ * aparece.
+ *
+ * A URL é lida aqui em cima, no carregamento do módulo, porque o `createClient`
+ * apaga o hash assim que processa o link — depois dele não sobra o que ler.
+ */
+const VEIO_DE_RECUPERACAO = (() => {
+  try {
+    const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const busca = new URLSearchParams(location.search);
+    return hash.get('type') === 'recovery' || busca.get('type') === 'recovery';
+  } catch {
+    return false;
+  }
+})();
+
+let recuperando = VEIO_DE_RECUPERACAO;
+
+/** A sessão atual veio de um link de "esqueci a senha"? */
+export function estaRecuperando() {
+  return recuperando;
+}
+
+/** Desiste da troca sem sair da conta. */
+export function limparRecuperacao() {
+  recuperando = false;
+  avisar();
+}
+
 /** Avisa a interface que a conta ou o plano mudou. */
 function avisar() {
   for (const fn of ouvintes) {
-    try { fn({ usuario: usuario(), vip: ehVip() }); } catch (err) { console.error(err); }
+    try { fn({ usuario: usuario(), vip: ehVip(), recuperando }); } catch (err) { console.error(err); }
   }
 }
 
 export function aoMudar(fn) {
   ouvintes.add(fn);
-  fn({ usuario: usuario(), vip: ehVip() });
+  fn({ usuario: usuario(), vip: ehVip(), recuperando });
   return () => ouvintes.delete(fn);
 }
 
@@ -74,15 +109,19 @@ export function iniciar() {
     const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
     cliente = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const { data } = await cliente.auth.getSession();
-    sessao = data.session || null;
-    await carregarPerfil();
-
-    cliente.auth.onAuthStateChange(async (_evento, nova) => {
+    // Assinado ANTES do getSession de propósito: o PASSWORD_RECOVERY nasce
+    // enquanto o SDK lê o link do e-mail, e quem assina depois perde o evento.
+    cliente.auth.onAuthStateChange(async (evento, nova) => {
+      if (evento === 'PASSWORD_RECOVERY') recuperando = true;
+      if (evento === 'SIGNED_OUT') recuperando = false;
       sessao = nova || null;
       await carregarPerfil();
       avisar();
     });
+
+    const { data } = await cliente.auth.getSession();
+    sessao = data.session || null;
+    await carregarPerfil();
 
     avisar();
     return cliente;
@@ -137,15 +176,42 @@ export async function entrarComGoogle() {
   exigirCliente();
   const { error } = await cliente.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: location.href },
+    options: { redirectTo: enderecoDeVolta() },
   });
   if (error) throw new Error(traduzir(error.message));
 }
 
 export async function recuperarSenha(email) {
   exigirCliente();
-  const { error } = await cliente.auth.resetPasswordForEmail(email, { redirectTo: location.href });
+  const { error } = await cliente.auth.resetPasswordForEmail(email, {
+    redirectTo: enderecoDeVolta(),
+  });
   if (error) throw new Error(traduzir(error.message));
+}
+
+/**
+ * Grava a senha nova. É o que fecha o ciclo do "esqueci a senha": o link do
+ * e-mail abre a sessão, isto troca a senha de verdade.
+ */
+export async function alterarSenha(nova) {
+  exigirCliente();
+  if (!sessao) throw new Error('A sessão expirou. Peça outro link de recuperação.');
+
+  const { error } = await cliente.auth.updateUser({ password: nova });
+  if (error) throw new Error(traduzir(error.message));
+
+  recuperando = false;
+  avisar();
+  return true;
+}
+
+/**
+ * Endereço para onde o e-mail devolve a pessoa, sem hash nem query.
+ * `location.href` traria junto o que já estivesse na barra e o Supabase
+ * precisa anexar o token dele num endereço limpo.
+ */
+function enderecoDeVolta() {
+  return location.origin + location.pathname;
 }
 
 export async function sair() {
@@ -162,5 +228,10 @@ function traduzir(msg) {
   if (m.includes('unable to validate email')) return 'E-mail inválido.';
   if (m.includes('email not confirmed')) return 'Confirme o e-mail antes de entrar.';
   if (m.includes('for security purposes')) return 'Muitas tentativas seguidas. Espere alguns segundos.';
+  if (m.includes('should be different')) return 'A senha nova precisa ser diferente da atual.';
+  if (m.includes('auth session missing')) return 'O link expirou. Peça outro e-mail de recuperação.';
+  if (m.includes('token has expired') || m.includes('invalid or has expired')) {
+    return 'Esse link já foi usado ou passou da validade. Peça outro.';
+  }
   return msg;
 }

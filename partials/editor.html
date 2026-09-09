@@ -40,6 +40,26 @@
       </p>
     </div>
 
+    <!-- Aparece quando a pessoa chega pelo link de "esqueci a senha". -->
+    <div id="contaRecuperar" hidden>
+      <h2>Criar uma senha nova</h2>
+      <p class="hd-sub">Você entrou pelo link do e-mail. Escolha a senha que vai usar daqui em diante.</p>
+
+      <label class="ed-field">Nova senha
+        <input type="password" id="contaSenhaNova" autocomplete="new-password" placeholder="mínimo 6 caracteres" />
+      </label>
+      <label class="ed-field">Repita a nova senha
+        <input type="password" id="contaSenhaNova2" autocomplete="new-password" placeholder="digite a mesma senha" />
+      </label>
+
+      <button class="btn primary full" id="contaSalvarSenha">Salvar senha</button>
+
+      <p class="hd-aviso" id="contaAvisoSenha"></p>
+      <p class="conta-troca">
+        <button type="button" class="link-botao" id="contaPularSenha">Agora não, continuar assim</button>
+      </p>
+    </div>
+
     <div id="contaLogada" hidden>
       <div class="conta-avatar" id="contaInicial">?</div>
       <h2 id="contaEmailLogado">—</h2>
