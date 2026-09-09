@@ -23,7 +23,7 @@ export const TEXTO_PLANO = 'pagamento único, acesso vitalício';
  * É pública por design (Painel > sua aplicação > Credenciais). O Access Token,
  * esse sim secreto, vive só nas variáveis de ambiente do servidor.
  */
-export const MP_PUBLIC_KEY = '';   // ex.: 'APP_USR-0000...' ou 'TEST-0000...'
+export const MP_PUBLIC_KEY = 'APP_USR-5d8feedf-bdee-4c6c-a151-1d157ae775a4';
 
 /** Valor cobrado. O servidor tem o seu próprio (PRECO_VIP) e é ele que vale. */
 export const VALOR_VIP = 19.90;
