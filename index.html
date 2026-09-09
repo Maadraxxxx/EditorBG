@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EditorBG · Remover fundo e editar imagens</title>
+  <meta name="description" content="Remova o fundo das suas imagens com IA e edite recorte, tamanho e cores — tudo no navegador." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9986;</text></svg>" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <!-- Duas plaquetas sobrepostas: a marca anuncia as duas ferramentas do site,
+         nas mesmas cores dos cards abaixo. -->
+    <div class="logo-duo" aria-hidden="true">
+      <span class="logo-tile logo-back">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/></svg>
+      </span>
+      <span class="logo-tile logo-front">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/>
+          <path d="M20 4 8.7 16.2"/><path d="M20 20 8.7 7.8"/>
+        </svg>
+      </span>
+    </div>
+    <div>
+      <h1>EditorBG</h1>
+      <p>Remover fundo e editar imagens — direto no seu navegador</p>
+    </div>
+  </div>
+</header>
+
+<main class="home">
+  <section class="home-hero">
+    <h2>O que você quer fazer?</h2>
+    <p>Tudo roda dentro do seu navegador. Suas imagens não são enviadas para servidor nenhum.</p>
+  </section>
+
+  <nav class="home-cards">
+    <a class="home-card" href="remover-fundo.html">
+      <div class="home-icon">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/>
+          <path d="M20 4 8.6 16.4"/><path d="M20 20 8.6 7.6"/>
+        </svg>
+      </div>
+      <h3>Remover fundo</h3>
+      <p>A IA reconhece o objeto principal e apaga o fundo. Depois você escolhe fundo transparente ou colorido.</p>
+      <ul class="home-list">
+        <li>Reconhecimento automático do objeto</li>
+        <li>Várias imagens de uma vez</li>
+        <li>Pincel para corrigir o que a IA errar</li>
+      </ul>
+      <span class="home-go">Começar →</span>
+    </a>
+
+    <a class="home-card" href="editar.html">
+      <div class="home-icon home-icon-edit">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/>
+        </svg>
+      </div>
+      <h3>Editar imagem</h3>
+      <p>Recorte, defina o tamanho exato em pixels, ajuste cores e gire a imagem. Sem passar pela IA.</p>
+      <ul class="home-list">
+        <li>Recorte com proporções fixas</li>
+        <li>Largura e altura em pixels</li>
+        <li>Brilho, contraste, saturação e rotação</li>
+      </ul>
+      <span class="home-go">Começar →</span>
+    </a>
+  </nav>
+</main>
+
+</body>
+</html>

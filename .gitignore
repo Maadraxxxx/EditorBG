@@ -1,0 +1,21 @@
+# Estado local do CLI do Supabase (ref do projeto, versões, url do pooler).
+# Não é segredo, mas é específico da máquina — cada clone gera o seu com
+# `supabase link`.
+supabase/.temp
+supabase/.branches
+
+# Segredos: as chaves do Mercado Pago e a service_role do Supabase vivem nas
+# variáveis de ambiente da Vercel, nunca em arquivo.
+.env
+.env.*
+!.env.example
+
+# Configurações locais do Claude Code
+.claude/settings.local.json
+
+# Dependências, caso algum dia entrem
+node_modules/
+
+# Lixo de sistema
+Thumbs.db
+.DS_Store

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Remover fundo · EditorBG</title>
+  <meta name="description" content="Remova o fundo das suas imagens automaticamente com IA, direto no navegador." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9986;</text></svg>" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html" title="Voltar para o início">
+    <div class="logo">✂</div>
+    <div>
+      <h1>EditorBG</h1>
+      <p>Remoção de fundo com IA — direto no seu navegador</p>
+    </div>
+  </a>
+  <div class="engine" id="engine">
+    <span class="dot" id="engineDot"></span>
+    <span id="engineLabel">Modelo não carregado</span>
+  </div>
+</header>
+
+<main>
+  <!-- ÁREA DE UPLOAD -->
+  <section class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Enviar imagens">
+    <div class="dz-icon">🖼️</div>
+    <h2>Arraste suas imagens aqui</h2>
+    <p>ou <span class="link">clique para escolher</span> · você também pode colar com <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
+    <small>PNG, JPG, WEBP · várias de uma vez · nada é enviado para servidores</small>
+    <input type="file" id="fileInput" accept="image/*" multiple hidden />
+  </section>
+
+  <!-- BARRA DE PROGRESSO DO MODELO -->
+  <section class="loader" id="loader" hidden>
+    <div class="loader-head">
+      <strong id="loaderTitle">Baixando o modelo de IA…</strong>
+      <span id="loaderPct">0%</span>
+    </div>
+    <div class="bar"><div class="bar-fill" id="loaderBar"></div></div>
+    <small id="loaderNote">Só acontece na primeira vez — depois fica em cache no navegador.</small>
+  </section>
+
+  <!-- CONTROLES -->
+  <!-- AJUSTES DA IA — sempre visíveis, podem ser mudados antes de enviar imagens -->
+  <section class="settings">
+    <div class="tool-group">
+      <label class="tool-label">Modelo de IA</label>
+      <div class="seg" id="modelSel">
+        <button data-model="padrao" class="is-active">Padrão</button>
+        <button data-model="finos">Detalhes finos <span class="selo-vip mini">VIP</span></button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <label class="tool-label">Segunda passada em alta resolução <span class="selo-vip">VIP</span></label>
+      <label class="switch">
+        <input type="checkbox" id="twoPass" checked />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text" id="twoPassText">Ligada</span>
+      </label>
+    </div>
+
+    <p class="hint" id="modelHint"></p>
+  </section>
+
+  <section class="toolbar" id="toolbar" hidden>
+    <div class="tool-group">
+      <label class="tool-label">Fundo</label>
+      <div class="bg-options" id="bgOptions">
+        <button class="bg-chip is-active" data-bg="transparent" title="Transparente">
+          <span class="swatch checker"></span>Transparente
+        </button>
+        <button class="bg-chip" data-bg="#ffffff" title="Branco"><span class="swatch" style="background:#fff"></span>Branco</button>
+        <button class="bg-chip" data-bg="#000000" title="Preto"><span class="swatch" style="background:#000"></span>Preto</button>
+        <button class="bg-chip" data-bg="#2563eb" title="Azul"><span class="swatch" style="background:#2563eb"></span>Azul</button>
+        <button class="bg-chip" data-bg="#22c55e" title="Verde"><span class="swatch" style="background:#22c55e"></span>Verde</button>
+        <label class="bg-chip custom" title="Cor personalizada">
+          <span class="swatch" id="customSwatch" style="background:#f43f5e"></span>Personalizada
+          <input type="color" id="customColor" value="#f43f5e" />
+        </label>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <label class="tool-label" for="feather">Suavizar borda <span class="val" id="featherVal">0px</span></label>
+      <input type="range" id="feather" min="0" max="6" step="1" value="0" />
+    </div>
+
+    <div class="tool-actions">
+      <button class="btn ghost" id="clearBtn">Limpar tudo</button>
+      <button class="btn hd" id="downloadHDBtn" title="Resolução original">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 6.1 6.6.6-5 4.4 1.5 6.5L12 17.2 6.2 20.6l1.5-6.5-5-4.4 6.6-.6Z"/></svg>
+        HD
+      </button>
+      <button class="btn primary" id="downloadAllBtn">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.4v11.8"/><path d="m7.2 10.6 4.8 4.8 4.8-4.8"/><path d="M4.2 20.2h15.6"/></svg>
+        <span id="downloadAllLabel">Baixar todas (.zip)</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- RESULTADOS -->
+  <section class="grid" id="grid"></section>
+</main>
+
+<script type="module">
+  import { boot } from './js/boot.js';
+  boot();
+</script>
+</body>
+</html>

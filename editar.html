@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Editar imagem · EditorBG</title>
+  <meta name="description" content="Recorte, redimensione e ajuste suas imagens direto no navegador." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9998;</text></svg>" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-mode="editor">
+
+<script type="module">
+  // O editor ocupa a página inteira: injeta o markup e entrega o controle a editar.js.
+  const html = await fetch('partials/editor.html').then((r) => r.text());
+  document.body.insertAdjacentHTML('beforeend', html);
+  await import('./js/editar.js');
+</script>
+
+</body>
+</html>
