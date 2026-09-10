@@ -3,10 +3,55 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EditorBG · Remover fundo e editar imagens</title>
-  <meta name="description" content="Remova o fundo das suas imagens com IA e edite recorte, tamanho e cores — tudo no navegador." />
+  <title>EditorBG — remover fundo de imagem grátis, sem enviar para servidor</title>
+  <meta name="description" content="Remova o fundo das suas imagens com IA e edite recorte, tamanho e cores. Tudo acontece no seu navegador: as imagens não são enviadas para servidor nenhum." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9986;</text></svg>" />
+  <link rel="canonical" href="https://editorbg.com.br/" />
+
+  <!-- Como o link aparece quando alguem compartilha no WhatsApp, no
+       Facebook ou no X. Sem isto, sai um retangulo cinza sem titulo. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="EditorBG" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:url" content="https://editorbg.com.br/" />
+  <meta property="og:title" content="EditorBG — remover fundo de imagem grátis, sem enviar para servidor" />
+  <meta property="og:description" content="Remova o fundo das suas imagens com IA e edite recorte, tamanho e cores. Tudo acontece no seu navegador: as imagens não são enviadas para servidor nenhum." />
+  <meta property="og:image" content="https://editorbg.com.br/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+
   <link rel="stylesheet" href="css/style.css" />
+
+  <!-- Descreve o site em linguagem de máquina. É o que permite o Google
+       mostrar o resultado com mais do que título e duas linhas de texto.
+       Os preços aqui têm que continuar batendo com js/planos.js. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "EditorBG",
+    "url": "https://editorbg.com.br/",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Qualquer navegador",
+    "inLanguage": "pt-BR",
+    "description": "Remove o fundo de imagens com IA e edita recorte, tamanho e cores. O processamento acontece no navegador de quem usa: as imagens não são enviadas para servidor nenhum.",
+    "featureList": [
+      "Remoção de fundo automática com IA",
+      "Pincel para corrigir o recorte",
+      "Recorte com proporções fixas",
+      "Redimensionamento em pixels",
+      "Ajuste de brilho, contraste e saturação",
+      "Download em PNG ou JPG"
+    ],
+    "offers": [
+      { "@type": "Offer", "name": "Grátis", "price": "0", "priceCurrency": "BRL" },
+      { "@type": "Offer", "name": "VIP 1 mês", "price": "4.90", "priceCurrency": "BRL" },
+      { "@type": "Offer", "name": "VIP 3 meses", "price": "12.90", "priceCurrency": "BRL" },
+      { "@type": "Offer", "name": "VIP vitalício", "price": "19.90", "priceCurrency": "BRL" }
+    ]
+  }
+  </script>
 </head>
 <body>
 
