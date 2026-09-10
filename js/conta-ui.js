@@ -126,8 +126,8 @@ function pintarFormulario() {
   const entrando = modo === 'entrar';
   $('contaTitulo').textContent = entrando ? 'Entrar' : 'Criar conta';
   $('contaEnviar').textContent = entrando ? 'Entrar' : 'Criar conta';
-  $('contaTexto').textContent = entrando ? 'Não tem conta?' : 'Já tem conta?';
-  $('contaAlternar').textContent = entrando ? 'Criar conta' : 'Entrar';
+  // Sem a frase "Não tem conta?" ao lado, o rótulo precisa se explicar sozinho.
+  $('contaAlternar').textContent = entrando ? 'Criar conta' : 'Já tenho conta';
   $('contaSenha').autocomplete = entrando ? 'current-password' : 'new-password';
 
   // Conferir e-mail e senha so faz sentido para quem esta criando a conta.
