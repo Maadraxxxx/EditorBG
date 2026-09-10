@@ -46,11 +46,17 @@ export default async function handler(req, res) {
   }
 
   if (!cargo.achou) {
-    return res.status(403).json({
+    // Com a service_role key correta o RLS é ignorado, e toda conta logada tem
+    // perfil (o gatilho cria junto com a conta). Chegar aqui quase sempre quer
+    // dizer que a chave nas variáveis de ambiente não é a service_role: a
+    // consulta passa, mas volta vazia porque o RLS filtrou tudo.
+    return res.status(500).json({
       ok: false,
       conta: usuario.email,
-      motivo: 'Esta conta não tem perfil na tabela `perfis`. '
-        + 'Ela foi criada antes da tabela existir, ou o gatilho não rodou.',
+      motivo: 'A consulta do perfil voltou vazia. O motivo mais comum é '
+        + 'SUPABASE_SERVICE_ROLE_KEY estar com a chave errada — confira se é '
+        + 'mesmo a service_role, e não a anon. '
+        + '(A outra possibilidade é esta conta não ter linha em `perfis`.)',
     });
   }
 

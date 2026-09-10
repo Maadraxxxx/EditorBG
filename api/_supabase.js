@@ -11,7 +11,41 @@ export function ambiente() {
   if (!url || !chave) {
     throw new Error('Servidor sem SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY.');
   }
+
+  const papel = papelDaChave(chave);
+  if (papel && papel !== 'service_role') {
+    throw new Error(
+      'A variável SUPABASE_SERVICE_ROLE_KEY está com uma chave de "' + papel + '", '
+      + 'não a service_role. As duas são parecidas — pegue a de baixo em '
+      + 'Supabase > Project Settings > API > service_role.'
+    );
+  }
+
   return { url: url.replace(/\/$/, ''), chave };
+}
+
+/**
+ * Espia o papel declarado dentro da chave, sem validar assinatura nenhuma.
+ *
+ * Existe por um engano fácil e caro: a anon key e a service_role key são os
+ * dois JWTs longos, parecidos, um embaixo do outro na mesma tela do Supabase.
+ * Trocar uma pela outra produz o sintoma mais confuso possível — o login
+ * funciona (a anon key basta para o gateway), mas toda leitura de tabela volta
+ * vazia por causa do RLS, e o site conclui "você não é administrador".
+ *
+ * Devolve null quando a chave não é um JWT: o Supabase também emite chaves no
+ * formato `sb_secret_...`, e recusar o que não se reconhece seria pior do que
+ * deixar passar.
+ */
+function papelDaChave(chave) {
+  const partes = String(chave).split('.');
+  if (partes.length !== 3) return null;
+  try {
+    const corpo = JSON.parse(Buffer.from(partes[1], 'base64url').toString('utf8'));
+    return typeof corpo.role === 'string' ? corpo.role : null;
+  } catch {
+    return null;
+  }
 }
 
 export function cabecalhos(chave, extra) {
