@@ -403,3 +403,28 @@ node testes/planos.mjs && node testes/admin.mjs
 `planos.mjs` cobre preço, validade, renovação, o pulo de calendário de 31/01 e
 a recusa de um valor vindo do navegador. `admin.mjs` cobre quem entra e quem
 não entra no painel.
+
+## Endereços sem `.html`
+
+`vercel.json` liga `cleanUrls`, então o site atende `editorbg.com.br/remover-fundo`
+em vez de `.../remover-fundo.html`, e `/` em vez de `/index.html`. Os endereços
+antigos continuam funcionando — a Vercel redireciona com 308, então link já
+compartilhado não quebra.
+
+O `serve.py` faz a mesma coisa na sua máquina. Sem isso, o site testado local e
+o publicado seriam dois sites com regras de rota diferentes, e a diferença só
+apareceria depois do deploy.
+
+**Por que o `vercel.json` não tem comentários:** JSON não aceita, e a Vercel
+valida o arquivo contra um schema. Uma chave inventada ali dentro reprova o
+build inteiro — e build reprovado tira o site do ar. As explicações ficam aqui.
+
+Duas coisas nele que não são óbvias:
+
+- `functions.includeFiles` força `js/planos.js` a entrar no pacote das funções.
+  Elas importam esse arquivo, que mora fora de `api/`; a Vercel rastreia import
+  estático sozinha, mas o caminho do pagamento não é lugar para apostar nisso.
+  Se o arquivo não subisse junto, a função quebraria no import e ninguém
+  conseguiria pagar.
+- `trailingSlash: false` evita que `/remover-fundo` e `/remover-fundo/` virem
+  dois endereços com o mesmo conteúdo, o que confunde buscador.
