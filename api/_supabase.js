@@ -13,11 +13,12 @@ export function ambiente() {
   }
 
   const papel = papelDaChave(chave);
-  if (papel && papel !== 'service_role') {
+  if (papel === 'publica') {
     throw new Error(
-      'A variável SUPABASE_SERVICE_ROLE_KEY está com uma chave de "' + papel + '", '
-      + 'não a service_role. As duas são parecidas — pegue a de baixo em '
-      + 'Supabase > Project Settings > API > service_role.'
+      'A variável SUPABASE_SERVICE_ROLE_KEY está com uma chave PÚBLICA. '
+      + 'Ela precisa da chave secreta: Supabase > Project Settings > API Keys > '
+      + 'seção "Secret keys" (a que começa com sb_secret_), ou, na aba '
+      + '"Legacy anon, service_role API keys", a service_role.'
     );
   }
 
@@ -25,24 +26,35 @@ export function ambiente() {
 }
 
 /**
- * Espia o papel declarado dentro da chave, sem validar assinatura nenhuma.
+ * Diz se a chave é pública ou secreta, sem validar assinatura nenhuma — isso é
+ * trabalho do Supabase; aqui só se lê o que a própria chave declara.
  *
- * Existe por um engano fácil e caro: a anon key e a service_role key são os
- * dois JWTs longos, parecidos, um embaixo do outro na mesma tela do Supabase.
- * Trocar uma pela outra produz o sintoma mais confuso possível — o login
- * funciona (a anon key basta para o gateway), mas toda leitura de tabela volta
- * vazia por causa do RLS, e o site conclui "você não é administrador".
+ * Existe por um engano fácil e caro: a chave pública e a secreta ficam uma
+ * embaixo da outra na mesma tela, com nomes parecidos. Trocar uma pela outra
+ * produz o sintoma mais confuso possível — o login funciona (a chave pública
+ * basta para o gateway), mas toda leitura de tabela volta vazia por causa do
+ * RLS, e o servidor conclui "você não é administrador".
  *
- * Devolve null quando a chave não é um JWT: o Supabase também emite chaves no
- * formato `sb_secret_...`, e recusar o que não se reconhece seria pior do que
- * deixar passar.
+ * Os dois formatos que o Supabase emite hoje:
+ *   sb_publishable_... / sb_secret_...   formato novo
+ *   JWT com `role` dentro                formato legado (anon / service_role)
+ *
+ * Devolve null para o que não se reconhece. Recusar chave desconhecida seria
+ * pior do que deixar passar: quebraria o site por causa de um formato futuro.
  */
 function papelDaChave(chave) {
-  const partes = String(chave).split('.');
+  const texto = String(chave).trim();
+
+  if (texto.startsWith('sb_secret_')) return 'secreta';
+  if (texto.startsWith('sb_publishable_')) return 'publica';
+
+  const partes = texto.split('.');
   if (partes.length !== 3) return null;
   try {
     const corpo = JSON.parse(Buffer.from(partes[1], 'base64url').toString('utf8'));
-    return typeof corpo.role === 'string' ? corpo.role : null;
+    if (corpo.role === 'service_role') return 'secreta';
+    if (corpo.role === 'anon' || corpo.role === 'authenticated') return 'publica';
+    return null;
   } catch {
     return null;
   }
