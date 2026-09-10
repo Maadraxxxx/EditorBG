@@ -20,7 +20,7 @@ const ENDERECO = '/api/admin';
  * ------------------------------------------------------------------ */
 async function pedir(acao, extra) {
   const token = Conta.tokenAcesso();
-  if (!token) throw new Error('sem-conta');
+  if (!token) throw etiquetar('sem-conta', {});
 
   const r = await fetch(ENDERECO, {
     method: 'POST',
@@ -28,12 +28,21 @@ async function pedir(acao, extra) {
     body: JSON.stringify({ acao, ...(extra || {}) }),
   });
 
-  if (r.status === 401) throw new Error('sem-conta');
-  if (r.status === 403) throw new Error('sem-cargo');
-
   const dados = await r.json().catch(() => ({}));
-  if (!r.ok || !dados.ok) throw new Error(dados.motivo || 'Algo deu errado no servidor.');
+
+  if (r.status === 401) throw etiquetar('sem-conta', dados);
+  if (r.status === 403) throw etiquetar('sem-cargo', dados);
+  if (!r.ok || !dados.ok) throw etiquetar('servidor', dados);
+
   return dados;
+}
+
+/** Erro que carrega junto o que o servidor respondeu, para a tela explicar. */
+function etiquetar(tipo, dados) {
+  const err = new Error(dados.motivo || 'Algo deu errado no servidor.');
+  err.tipo = tipo;
+  err.conta = dados.conta || null;
+  return err;
 }
 
 /* ------------------------------------------------------------------ *
@@ -221,13 +230,20 @@ async function abrir() {
     $('admBarrado').hidden = true;
     $('admConteudo').hidden = false;
   } catch (err) {
-    if (err.message === 'sem-conta') {
+    if (err.tipo === 'sem-conta') {
       barrar('Entre na sua conta', 'Use o botão no topo da página para entrar.');
-    } else if (err.message === 'sem-cargo') {
-      barrar('Área restrita', 'Esta página é só para administradores.');
-    } else {
-      barrar('Não deu para abrir o painel', err.message);
+      return;
     }
+
+    if (err.tipo === 'sem-cargo') {
+      // Dizer com qual conta o servidor te viu resolve na hora o engano mais
+      // comum: estar logado numa conta diferente da que tem o cargo.
+      const comQuem = err.conta ? ' Você está entrando como ' + err.conta + '.' : '';
+      barrar('Área restrita', err.message + comQuem);
+      return;
+    }
+
+    barrar('Não deu para abrir o painel', err.message);
   }
 }
 

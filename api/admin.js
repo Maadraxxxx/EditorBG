@@ -12,7 +12,7 @@
  *   SUPABASE_SERVICE_ROLE_KEY  service_role key — NUNCA vá para o navegador
  */
 
-import { ambiente, cabecalhos, usuarioDoToken, ehAdmin, rpc } from './_supabase.js';
+import { ambiente, cabecalhos, usuarioDoToken, lerCargo, rpc } from './_supabase.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -33,8 +33,36 @@ export default async function handler(req, res) {
   if (!usuario) {
     return res.status(401).json({ ok: false, motivo: 'Entre na sua conta.' });
   }
-  if (!(await ehAdmin(usuario.id, env))) {
-    return res.status(403).json({ ok: false, motivo: 'Esta área é só para administradores.' });
+
+  let cargo;
+  try {
+    cargo = await lerCargo(usuario.id, env);
+  } catch (err) {
+    // Não conseguimos conferir o cargo. Isso NÃO é o mesmo que "você não é
+    // admin", e devolver 403 aqui mandaria o dono do site procurar no lugar
+    // errado.
+    console.error('admin: falhou ao ler o cargo —', err.message);
+    return res.status(500).json({ ok: false, motivo: err.message });
+  }
+
+  if (!cargo.achou) {
+    return res.status(403).json({
+      ok: false,
+      conta: usuario.email,
+      motivo: 'Esta conta não tem perfil na tabela `perfis`. '
+        + 'Ela foi criada antes da tabela existir, ou o gatilho não rodou.',
+    });
+  }
+
+  if (!cargo.admin) {
+    // Devolve o e-mail que o SERVIDOR enxergou. Quando alguém jura que é
+    // administrador e leva 403, quase sempre está logado em outra conta — e
+    // essa linha resolve a dúvida na hora.
+    return res.status(403).json({
+      ok: false,
+      conta: usuario.email,
+      motivo: 'Esta área é só para administradores.',
+    });
   }
 
   const corpo = req.body || {};

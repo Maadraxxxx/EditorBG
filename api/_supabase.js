@@ -50,15 +50,44 @@ export async function usuarioDoToken(req, env) {
  * "sou admin" pudesse vir de fora, bastaria alguém editar a requisição para
  * entrar no painel. O token só serve para dizer QUEM é a pessoa; o que ela
  * pode fazer quem responde é a tabela.
+ *
+ * TRÊS RESPOSTAS DIFERENTES, DE PROPÓSITO:
+ *
+ *   {achou: true,  admin: ...}  o perfil existe e o cargo é este
+ *   {achou: false}              não há perfil para esta conta
+ *   lança erro                  a consulta em si falhou
+ *
+ * A versão anterior devolvia `false` nos três casos. O resultado é que uma
+ * chave errada nas variáveis de ambiente aparecia para o dono do site como
+ * "esta área é só para administradores" — uma mensagem que aponta para o lugar
+ * errado e não dá nenhuma pista do que consertar. Falha de infraestrutura tem
+ * que soar como falha de infraestrutura.
  */
-export async function ehAdmin(id, env) {
-  const r = await fetch(
-    env.url + '/rest/v1/perfis?select=admin&id=eq.' + encodeURIComponent(id),
-    { headers: cabecalhos(env.chave) }
-  );
-  if (!r.ok) return false;
+export async function lerCargo(id, env) {
+  let r;
+  try {
+    r = await fetch(
+      env.url + '/rest/v1/perfis?select=admin,email&id=eq.' + encodeURIComponent(id),
+      { headers: cabecalhos(env.chave) }
+    );
+  } catch (err) {
+    throw new Error('Não deu para falar com o banco: ' + err.message);
+  }
+
+  if (!r.ok) {
+    const detalhe = (await r.text()).slice(0, 200);
+    // 401/403 aqui é quase sempre SUPABASE_SERVICE_ROLE_KEY errada ou de outro
+    // projeto — vale dizer isso em voz alta em vez de deixar adivinhar.
+    const dica = (r.status === 401 || r.status === 403)
+      ? ' Confira SUPABASE_SERVICE_ROLE_KEY e SUPABASE_URL nas variáveis de ambiente.'
+      : '';
+    throw new Error('O banco recusou a consulta do cargo (HTTP ' + r.status + ').' + dica +
+      (detalhe ? ' Resposta: ' + detalhe : ''));
+  }
+
   const linhas = await r.json();
-  return !!(linhas[0] && linhas[0].admin === true);
+  if (!linhas.length) return { achou: false };
+  return { achou: true, admin: linhas[0].admin === true, email: linhas[0].email };
 }
 
 export async function rpc(nome, corpo, env) {
