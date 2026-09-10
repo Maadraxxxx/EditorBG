@@ -27,7 +27,6 @@ export const PLANOS = {
     valor: 12.90,
     meses: 3,
     descricao: 'sai por R$ 4,30 por mês',
-    destaque: true,
   },
   vitalicio: {
     id: 'vitalicio',
@@ -35,6 +34,7 @@ export const PLANOS = {
     valor: 19.90,
     meses: null,            // null = não expira
     descricao: 'paga uma vez e acabou',
+    destaque: true,         // a fita "melhor valor" — só um plano pode ter
   },
 };
 
