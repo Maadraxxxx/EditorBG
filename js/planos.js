@@ -41,8 +41,14 @@ export const PLANOS = {
 /** Ordem em que aparecem na tela, do mais barato ao mais caro. */
 export const ORDEM = ['mensal', 'trimestral', 'vitalicio'];
 
-/** Qual vem marcado ao abrir. O do meio, que é o de melhor custo-benefício. */
-export const PLANO_PADRAO = 'trimestral';
+/**
+ * Qual vem marcado ao abrir — o mesmo que leva a fita "melhor valor". Destacar
+ * um e marcar outro faria a tela dar dois conselhos diferentes ao mesmo tempo.
+ *
+ * Vale também no servidor: api/pagar.js cobra este plano quando a requisição
+ * chega sem escolha nenhuma.
+ */
+export const PLANO_PADRAO = 'vitalicio';
 
 /** Devolve o plano, ou undefined se o id não existir. Nunca confie no id vindo de fora sem passar por aqui. */
 export function plano(id) {

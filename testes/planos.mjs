@@ -6,7 +6,7 @@ process.env.SUPABASE_URL = 'https://exemplo.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_mentira';
 process.env.MP_ACCESS_TOKEN = 'APP_USR-mentira';
 
-const { PLANOS, novaValidade, vipAtivo, planoDoPagamento, planoPeloValor, precoEscrito } =
+const { PLANOS, PLANO_PADRAO, novaValidade, vipAtivo, planoDoPagamento, planoPeloValor, precoEscrito } =
   await import('../js/planos.js');
 
 let falhas = 0;
@@ -142,7 +142,10 @@ r = await tentarPagar({ plano: 'de-graca', formData: { payment_method_id: 'pix' 
 ok('plano inventado e recusado', r.res.codigo, 400);
 
 r = await tentarPagar({ formData: { payment_method_id: 'pix' } });
-ok('sem plano usa o padrao', r.enviadoAoMP.transaction_amount, PLANOS.trimestral.valor);
+// Amarrado ao PLANO_PADRAO, nao a um plano escrito na mao: trocar qual vem
+// marcado e uma decisao de produto, e o teste nao deveria reprovar por isso.
+ok('sem plano usa o padrao (' + PLANO_PADRAO + ')',
+  r.enviadoAoMP.transaction_amount, PLANOS[PLANO_PADRAO].valor);
 
 ok('webhook aponta para o dominio certo',
   r.enviadoAoMP.notification_url, 'https://editorbg.com.br/api/webhook-mp');
