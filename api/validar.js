@@ -109,5 +109,30 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, motivo: 'Pagamento confirmado, mas falhou ao liberar o plano. Fale com o suporte.' });
   }
 
+  /* ---- 5. registra o dinheiro ---- */
+  // Mesmo registro que o webhook faz. Este caminho é o plano B, usado quando a
+  // notificação não chega; sem gravar aqui também, um pagamento liberado por
+  // ele sumiria do faturamento do painel.
+  try {
+    await fetch(supabaseUrl + '/rest/v1/pagamentos', {
+      method: 'POST',
+      headers: { ...cabecalhos, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        id: pagamentoId,
+        usuario_id: usuario.id,
+        email: (pagamento.payer && pagamento.payer.email) || usuario.email || null,
+        valor: pagamento.transaction_amount || 0,
+        moeda: pagamento.currency_id || 'BRL',
+        meio: pagamento.payment_method_id || null,
+        status: pagamento.status,
+        criado_em: pagamento.date_approved || pagamento.date_created || new Date().toISOString(),
+      }),
+    });
+  } catch (err) {
+    // O plano já foi liberado; um número torto no painel não justifica devolver
+    // erro para quem acabou de pagar.
+    console.error('Não deu para registrar o pagamento:', err);
+  }
+
   return res.status(200).json({ ok: true, vip: true });
 }

@@ -89,5 +89,32 @@ export default async function handler(req, res) {
     return res.status(500).json({ erro: 'gravação falhou' });   // deixa reenviar
   }
 
+  /* ---- registra o dinheiro ---- */
+  // Separado do bloco acima de propósito: o que libera o VIP é o perfil, e se
+  // esta gravação falhar a pessoa não pode ficar sem o que pagou. O prejuízo
+  // aqui é um número errado no painel, não um cliente sem acesso.
+  //
+  // merge-duplicates porque o Mercado Pago reenvia a mesma notificação: o id do
+  // pagamento é a chave, então repetir atualiza em vez de duplicar o faturamento.
+  try {
+    const r = await fetch(supabaseUrl + '/rest/v1/pagamentos', {
+      method: 'POST',
+      headers: { ...cabecalhos, Prefer: 'resolution=merge-duplicates' },
+      body: JSON.stringify({
+        id: pagamentoId,
+        usuario_id: usuarioId,
+        email: (pagamento.payer && pagamento.payer.email) || null,
+        valor: pagamento.transaction_amount || 0,
+        moeda: pagamento.currency_id || 'BRL',
+        meio: pagamento.payment_method_id || null,
+        status: pagamento.status,
+        criado_em: pagamento.date_approved || pagamento.date_created || new Date().toISOString(),
+      }),
+    });
+    if (!r.ok) console.error('Não deu para registrar o pagamento:', await r.text());
+  } catch (err) {
+    console.error('Não deu para registrar o pagamento:', err);
+  }
+
   return ok();
 }

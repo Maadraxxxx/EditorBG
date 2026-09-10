@@ -20,6 +20,20 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    def do_POST(self):
+        """
+        As funções de `api/` só existem na Vercel. Aqui elas viram um 204 vazio.
+
+        Sem isto, cada POST vira um 501 vermelho no console — e o erro é do
+        servidorzinho, não do site. Quem quiser rodar as funções de verdade na
+        própria máquina precisa do `vercel dev`, não deste arquivo.
+        """
+        if self.path.startswith("/api/"):
+            self.send_response(204)
+            self.end_headers()
+            return
+        self.send_error(501, "Unsupported method ('POST')")
+
     def log_message(self, fmt, *args):
         # silencia o log de cada arquivo servido
         pass

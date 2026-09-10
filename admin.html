@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel · EditorBG</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9986;</text></svg>" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <div class="logo-duo" aria-hidden="true">
+      <span class="logo-tile logo-back">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/></svg>
+      </span>
+      <span class="logo-tile logo-front">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/>
+          <path d="M20 4 8.7 16.2"/><path d="M20 20 8.7 7.8"/>
+        </svg>
+      </span>
+    </div>
+    <div>
+      <h1>Painel</h1>
+      <p>Números do site e contas</p>
+    </div>
+  </a>
+</header>
+
+<main class="admin">
+
+  <!-- Enquanto o cargo não é confirmado pelo servidor -->
+  <section class="admin-estado" id="admCarregando">
+    <div class="admin-girando" aria-hidden="true"></div>
+    <p>Conferindo seu acesso…</p>
+  </section>
+
+  <!-- Sem cargo de admin, ou deslogado -->
+  <section class="admin-estado" id="admBarrado" hidden>
+    <div class="admin-cadeado" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+           stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/>
+        <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+      </svg>
+    </div>
+    <h2 id="admBarradoTitulo">Área restrita</h2>
+    <p id="admBarradoTexto">Esta página é só para administradores.</p>
+    <a class="btn ghost" href="index.html">Voltar para o início</a>
+  </section>
+
+  <div id="admConteudo" hidden>
+
+    <!-- ------------------------------------------------------------ -->
+    <section class="admin-secao">
+      <div class="admin-titulo">
+        <h2>Visão geral</h2>
+        <button class="btn ghost" id="admAtualizar">Atualizar</button>
+      </div>
+
+      <div class="admin-numeros">
+        <div class="admin-num">
+          <span class="admin-rot">Visitantes hoje</span>
+          <strong id="numVisitasHoje">—</strong>
+          <small id="numVisitas7">—</small>
+        </div>
+        <div class="admin-num">
+          <span class="admin-rot">Visitantes no total</span>
+          <strong id="numVisitasTotal">—</strong>
+          <small>desde o começo da contagem</small>
+        </div>
+        <div class="admin-num">
+          <span class="admin-rot">Contas criadas</span>
+          <strong id="numContas">—</strong>
+          <small id="numContasHoje">—</small>
+        </div>
+        <div class="admin-num admin-num-vivo">
+          <span class="admin-rot">Logadas agora</span>
+          <strong id="numOnline">—</strong>
+          <small>ativas nos últimos 15 min</small>
+        </div>
+        <div class="admin-num">
+          <span class="admin-rot">Assinaturas pagas</span>
+          <strong id="numAssinaturas">—</strong>
+          <small id="numVips">—</small>
+        </div>
+        <div class="admin-num admin-num-dinheiro">
+          <span class="admin-rot">Faturado</span>
+          <strong id="numFaturado">—</strong>
+          <small id="numFaturadoMes">—</small>
+        </div>
+      </div>
+
+      <p class="admin-nota">
+        Visitante é contado uma vez por dia por pessoa. Cortesias dadas aqui no painel
+        entram como VIP, mas não somam no faturamento — só pagamento de verdade soma.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ -->
+    <section class="admin-secao">
+      <div class="admin-titulo">
+        <h2>Contas</h2>
+        <input type="search" id="admBusca" class="admin-busca" placeholder="Procurar por e-mail…" />
+      </div>
+
+      <div class="admin-tabela-wrap">
+        <table class="admin-tabela">
+          <thead>
+            <tr>
+              <th>E-mail</th>
+              <th>Criada em</th>
+              <th>Visto por último</th>
+              <th class="admin-c">VIP</th>
+              <th class="admin-c">Admin</th>
+            </tr>
+          </thead>
+          <tbody id="admLinhas"></tbody>
+        </table>
+      </div>
+
+      <p class="admin-vazio" id="admVazio" hidden>Nenhuma conta encontrada.</p>
+      <p class="hd-aviso" id="admAviso"></p>
+    </section>
+
+  </div>
+</main>
+
+<script type="module" src="js/admin.js"></script>
+
+</body>
+</html>

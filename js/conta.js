@@ -70,13 +70,13 @@ export function limparRecuperacao() {
 /** Avisa a interface que a conta ou o plano mudou. */
 function avisar() {
   for (const fn of ouvintes) {
-    try { fn({ usuario: usuario(), vip: ehVip(), recuperando }); } catch (err) { console.error(err); }
+    try { fn({ usuario: usuario(), vip: ehVip(), admin: ehAdmin(), recuperando }); } catch (err) { console.error(err); }
   }
 }
 
 export function aoMudar(fn) {
   ouvintes.add(fn);
-  fn({ usuario: usuario(), vip: ehVip(), recuperando });
+  fn({ usuario: usuario(), vip: ehVip(), admin: ehAdmin(), recuperando });
   return () => ouvintes.delete(fn);
 }
 
@@ -90,6 +90,17 @@ export function estaLogado() {
 
 export function ehVip() {
   return !!(perfil && perfil.vip);
+}
+
+/**
+ * Cargo de administrador.
+ *
+ * Serve só para decidir o que a tela mostra. Quem realmente barra o acesso ao
+ * painel e as mudancas de cargo e a funcao serverless, que confere isto no
+ * banco a cada chamada — mentir aqui no navegador nao abre porta nenhuma.
+ */
+export function ehAdmin() {
+  return !!(perfil && perfil.admin);
 }
 
 export function tokenAcesso() {
@@ -134,7 +145,7 @@ async function carregarPerfil() {
   if (!sessao) { perfil = null; return; }
   const { data, error } = await cliente
     .from('perfis')
-    .select('vip, email')
+    .select('vip, admin, email')
     .eq('id', sessao.user.id)
     .maybeSingle();
   if (error) console.warn('Não deu para ler o perfil:', error.message);

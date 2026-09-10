@@ -102,6 +102,7 @@ export function abrir(paraAssinar) {
     $('contaPlano').textContent = vip ? 'Plano VIP ativo' : 'Plano grátis';
     $('contaPlano').classList.toggle('vip', vip);
     $('contaVerVip').hidden = vip;
+    $('contaPainel').hidden = !Conta.ehAdmin();
   } else if (paraAssinar) {
     $('contaSub').textContent = 'Crie a conta para assinar o VIP.';
   }
@@ -256,3 +257,6 @@ function mostrarSenha(texto, tipo) {
 encaixarBotao();
 Conta.aoMudar(pintarBotao);
 Conta.iniciar();
+
+// Conta a visita e mantem o "ativos agora" do painel em dia.
+import('./presenca.js');

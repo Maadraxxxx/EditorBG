@@ -291,3 +291,47 @@ processar num servidor, o que custaria dinheiro e acabaria com a promessa de que
 computador.
 
 Já o **pagamento** é real: quem confirma é a API do Mercado Pago, e o `vip` só muda pelo servidor.
+
+## Painel do administrador
+
+Em `admin.html`, aberto pelo botão **Painel de controle** dentro do modal da
+conta — que só aparece para quem tem o cargo.
+
+Mostra visitantes (hoje, 7 dias, total), contas criadas, contas ativas nos
+últimos 15 minutos, assinaturas pagas e faturamento (total e do mês). Embaixo,
+a lista de contas com dois interruptores por linha: **VIP** e **admin**.
+
+### Por que esconder o botão não é a proteção
+
+Não é. Quem souber o endereço abre `admin.html` do mesmo jeito — e não consegue
+arrancar um número dela. Toda informação do painel passa por `/api/admin`, que
+antes de qualquer coisa:
+
+1. valida o token da sessão no Supabase (quem é você);
+2. lê `perfis.admin` **no banco**, com a service role key (o que você pode).
+
+O cargo nunca vem do navegador. Some isso ao fato de `perfis` não ter nenhuma
+política de UPDATE para o cliente, e ninguém se promove pelo console.
+
+### Cortesia não é faturamento
+
+VIP dado à mão pelo painel muda só o perfil. Ele **não** entra na tabela
+`pagamentos`, que é de onde sai o valor faturado — senão o total mentiria.
+
+### Como os visitantes são contados
+
+Uma vez por dia por pessoa, não por recarregamento. A "pessoa" é um hash de
+IP + navegador, calculado no servidor com a service key como sal. **O IP não é
+gravado**: o site inteiro se apoia na promessa de que nada sai do computador de
+quem usa, e um banco cheio de endereços de rede contradiria isso.
+
+### Primeiro administrador
+
+Não tem como se promover pela tela — a primeira promoção sai do banco:
+
+```sql
+update public.perfis set admin = true where email = 'seu@email.com';
+```
+
+Depois disso o painel se vira sozinho. Um admin não consegue tirar o próprio
+cargo, para que o painel nunca fique sem ninguém que entre.
