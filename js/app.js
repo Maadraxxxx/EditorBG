@@ -7,10 +7,7 @@ import { compose, cloneCanvas, defaultEdit } from './compose.js';
 import { MODELS, loadSegmenter, segmentImage } from './segment.js';
 import { openEditor } from './editor.js';
 import { refreshSliders } from './sliders.js';
-import {
-  baixar as baixarComPlano, abrirPaywall, temHD, aplicarLimite,
-  paraBlob, formatoAtual,
-} from './paywall.js';
+import { baixar as baixarComPlano, abrirPaywall, temHD, aplicarLimite } from './paywall.js';
 import * as Conta from './conta.js';
 import './conta-ui.js';
 
@@ -479,7 +476,7 @@ clearBtn.addEventListener('click', () => {
  * Downloads
  * ------------------------------------------------------------------ */
 function outputName(name) {
-  return name.replace(/\.[^./\\]+$/, '') + '-sem-fundo.' + formatoAtual().ext;
+  return name.replace(/\.[^./\\]+$/, '') + '-sem-fundo.png';
 }
 
 function downloadItem(item, opcoes) {
@@ -520,12 +517,11 @@ async function baixarTodas(hd) {
 
     for (const item of ready) {
       const canvas = aplicarLimite(item.resultCanvas, hd);
-      const blob = await paraBlob(canvas);
-      const ext = '.' + formatoAtual().ext;
+      const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
       let name = outputName(item.name);
       let n = 2;
       // Nomes repetidos dentro do .zip: um sobrescreveria o outro.
-      while (used.has(name)) name = outputName(item.name).slice(0, -ext.length) + '-' + n++ + ext;
+      while (used.has(name)) name = outputName(item.name).replace(/\.png$/, '-' + n++ + '.png');
       used.add(name);
       zip.file(name, blob);
     }
