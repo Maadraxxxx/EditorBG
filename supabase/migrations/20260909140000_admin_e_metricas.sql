@@ -122,6 +122,9 @@ as $$
     'online',       (select count(*) from perfis where ultimo_acesso > now() - interval '15 minutes'),
     'vips',         (select count(*) from perfis where vip),
     'assinaturas',  (select count(*) from pagamentos where status = 'approved'),
+    'assinaturasMes', (select count(*) from pagamentos
+                         where status = 'approved'
+                           and criado_em >= date_trunc('month', now())),
     'faturado',     coalesce((select sum(valor) from pagamentos where status = 'approved'), 0),
     'faturadoMes',  coalesce((select sum(valor) from pagamentos
                                 where status = 'approved'

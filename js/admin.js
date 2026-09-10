@@ -51,6 +51,11 @@ function etiquetar(tipo, dados) {
 const dinheiro = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const numero = new Intl.NumberFormat('pt-BR');
 
+/** "1 assinatura" e "2 assinaturas" — o singular aparece o tempo todo no começo. */
+function plural(n, um, varios) {
+  return numero.format(n) + ' ' + (n === 1 ? um : varios);
+}
+
 async function carregarResumo() {
   const { resumo: r } = await pedir('resumo');
 
@@ -59,17 +64,16 @@ async function carregarResumo() {
   $('numVisitasTotal').textContent = numero.format(r.visitasTotal);
 
   $('numContas').textContent = numero.format(r.contas);
-  $('numContasHoje').textContent = r.contasHoje === 1
-    ? '1 criada hoje'
-    : numero.format(r.contasHoje) + ' criadas hoje';
+  $('numContasHoje').textContent = plural(r.contasHoje, 'criada hoje', 'criadas hoje');
 
   $('numOnline').textContent = numero.format(r.online);
 
   $('numAssinaturas').textContent = numero.format(r.assinaturas);
-  $('numVips').textContent = numero.format(r.vips) + ' contas com VIP ativo';
+  $('numVips').textContent = plural(r.vips, 'conta com VIP ativo', 'contas com VIP ativo');
 
+  $('numFaturadoMes').textContent = dinheiro.format(r.faturadoMes);
+  $('numAssinaturasMes').textContent = plural(r.assinaturasMes, 'assinatura', 'assinaturas');
   $('numFaturado').textContent = dinheiro.format(r.faturado);
-  $('numFaturadoMes').textContent = dinheiro.format(r.faturadoMes) + ' neste mês';
 }
 
 /* ------------------------------------------------------------------ *
