@@ -25,6 +25,19 @@ body {
     radial-gradient(900px 500px at 12% -10%, rgba(99, 102, 241, .22), transparent 60%),
     radial-gradient(800px 500px at 92% 0%, rgba(34, 211, 238, .14), transparent 55%),
     var(--bg);
+
+  /* A caixa do body tem a altura da JANELA (height: 100% acima), não a do
+     conteúdo. Com o `repeat` padrão, os dois brilhos se repetiam a cada altura
+     de janela e deixavam uma linha horizontal atravessando a página em cada
+     emenda — só aparecia em página comprida.
+
+     `no-repeat` resolve pintando os brilhos uma vez só, no topo; o resto da
+     página fica com a cor de fundo sólida, que preenche a tela inteira. Manter
+     o `height: 100%` é de propósito: os brilhos são posicionados em
+     porcentagem, e numa caixa do tamanho do documento eles mudariam de lugar.
+
+     Esta linha tem que vir DEPOIS do shorthand, que repõe `repeat`. */
+  background-repeat: no-repeat;
   color: var(--txt);
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   display: flex;
