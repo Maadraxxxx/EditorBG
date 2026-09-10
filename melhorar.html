@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Melhorar qualidade de imagem online — grátis e no navegador</title>
+  <meta name="description" content="Recupere contraste, tire ruído e deixe a foto mais nítida. Sai na hora, direto no navegador, sem enviar a imagem para servidor nenhum." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#10024;</text></svg>" />
+  <link rel="canonical" href="https://editorbg.com.br/melhorar" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="EditorBG" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:url" content="https://editorbg.com.br/melhorar" />
+  <meta property="og:title" content="Melhorar qualidade de imagem online — grátis e no navegador" />
+  <meta property="og:description" content="Recupere contraste, tire ruído e deixe a foto mais nítida. Sai na hora, direto no navegador, sem enviar a imagem para servidor nenhum." />
+  <meta property="og:image" content="https://editorbg.com.br/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="/" title="Voltar para o início">
+    <div class="logo-duo" aria-hidden="true">
+      <span class="logo-tile logo-back">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/></svg>
+      </span>
+      <span class="logo-tile logo-front">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/>
+          <path d="M20 4 8.7 16.2"/><path d="M20 20 8.7 7.8"/>
+        </svg>
+      </span>
+    </div>
+    <div>
+      <h1>EditorBG</h1>
+      <p>Melhorar qualidade — direto no seu navegador</p>
+    </div>
+  </a>
+</header>
+
+<main>
+
+  <!-- ENTRADA -->
+  <section class="drop" id="drop">
+    <input type="file" id="file" accept="image/*" hidden />
+    <div class="drop-icon" aria-hidden="true">✨</div>
+    <h2>Arraste sua imagem aqui</h2>
+    <p>ou <button type="button" class="link-botao" id="escolher">clique para escolher</button> · você também pode colar com <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
+    <small>PNG, JPG, WEBP · nada é enviado para servidores</small>
+  </section>
+
+  <!-- RESULTADO -->
+  <section class="mq" id="resultado" hidden>
+
+    <div class="mq-palco">
+      <div class="mq-comparar" id="comparar">
+        <img class="mq-depois" id="imgDepois" alt="Imagem melhorada" />
+        <div class="mq-antes-caixa" id="antesCaixa">
+          <img class="mq-antes" id="imgAntes" alt="Imagem original" />
+          <span class="mq-tag">Original</span>
+        </div>
+        <div class="mq-alca" id="alca" role="separator" aria-label="Arraste para comparar"><span>⟺</span></div>
+      </div>
+      <p class="mq-dica">Arraste a barra para comparar com o original.</p>
+    </div>
+
+    <aside class="mq-lado">
+      <div class="mq-info">
+        <span class="mq-nome" id="nome">—</span>
+        <span class="mq-medidas" id="medidas">—</span>
+      </div>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Ajuste fino</span>
+
+        <label class="ed-field">
+          Nitidez <span class="val" id="vNitidez">42</span>
+          <input type="range" id="nitidez" min="0" max="100" step="1" value="42" />
+        </label>
+        <label class="ed-field">
+          Redução de ruído <span class="val" id="vRuido">75</span>
+          <input type="range" id="ruido" min="0" max="100" step="1" value="75" />
+        </label>
+        <label class="switch small">
+          <input type="checkbox" id="niveis" checked />
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-text">Contraste automático</span>
+        </label>
+      </div>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Dobrar o tamanho</span>
+        <p class="mq-nota" id="iaNota">—</p>
+        <button class="btn ghost full" id="botaoIA">Dobrar com IA</button>
+        <div class="mq-barra" id="iaBarra" hidden><div id="iaPreenche"></div></div>
+        <p class="mq-nota" id="iaEstado" hidden></p>
+      </div>
+
+      <p class="hd-aviso" id="aviso"></p>
+
+      <div class="mq-baixar">
+        <button class="btn hd" id="baixarHD">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.7 6.1 6.6.6-5 4.4 1.5 6.5L12 17.2 6.2 20.6l1.5-6.5-5-4.4 6.6-.6Z"/></svg>
+          Baixar em HD
+        </button>
+        <button class="btn primary" id="baixar">Baixar grátis</button>
+      </div>
+      <button class="link-botao" id="trocar">Trocar imagem</button>
+    </aside>
+  </section>
+
+  <!-- ------------------------------------------------------------ -->
+  <section class="conteudo">
+
+    <h2>O que "melhorar a qualidade" faz de verdade</h2>
+    <p>
+      Duas coisas diferentes, e vale saber qual você está usando.
+    </p>
+    <p>
+      A <strong>melhoria instantânea</strong> trabalha o que já está na foto:
+      estica o contraste até a faixa cheia, reduz o grão nas áreas lisas sem
+      borrar as bordas, e reforça a definição. Ela não inventa detalhe — se a
+      informação não foi capturada, ela não aparece. O que ela resolve é foto
+      lavada, mole ou granulada, que é a maioria dos casos.
+    </p>
+    <p>
+      A <strong>ampliação com IA</strong> é outra coisa: um modelo treinado em
+      milhares de imagens preenche o dobro de pixels com detalhe plausível.
+      Funciona bem, e é lenta — por isso só aparece em imagem pequena, com o
+      tempo estimado escrito antes de você começar.
+    </p>
+
+    <h2>Por que a IA só aceita imagem pequena</h2>
+    <p>
+      Porque ela roda no seu computador, não num servidor nosso. Medimos: o
+      modelo leva cerca de <strong>0,32 milissegundo por pixel</strong> de
+      entrada. Uma imagem de 500×500 leva perto de um minuto e meio; uma de
+      1000×1000 passaria de cinco minutos; uma foto de celular inteira levaria
+      quase uma hora.
+    </p>
+    <p class="conteudo-honesto">
+      Poderíamos processar num servidor e entregar em segundos. Não fazemos
+      porque isso significaria enviar a sua imagem para a nossa máquina, e o
+      site inteiro se apoia na promessa de que isso não acontece. O limite de
+      tamanho é o preço dessa escolha, e achamos que vale.
+    </p>
+
+    <h2>Perguntas frequentes</h2>
+
+    <details class="faq">
+      <summary>Quantas imagens posso melhorar por dia?</summary>
+      <p>
+        Sem VIP, duas por dia. Com VIP, sem limite. A melhoria em si é a mesma
+        nos dois casos — o que muda é a quantidade, e a resolução do arquivo
+        baixado.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Dá para recuperar uma foto muito borrada?</summary>
+      <p>
+        Só até certo ponto, e é bom saber disso antes. Nitidez reforça a borda
+        que existe; não recria a que se perdeu no desfoque de movimento ou no
+        foco errado. Foto levemente mole melhora bastante; foto muito borrada
+        melhora pouco.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>A imagem perde qualidade ao passar por aqui?</summary>
+      <p>
+        Não. O processamento acontece sobre a imagem original, em memória, e o
+        arquivo só é gerado no download. O plano grátis entrega o arquivo com
+        30% menos resolução; o VIP entrega no tamanho cheio.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Minha foto é enviada para algum servidor?</summary>
+      <p>
+        Não. Tanto a melhoria instantânea quanto o modelo de IA rodam dentro do
+        seu navegador. Depois que a página carregou, você pode desligar a
+        internet e continuar usando.
+      </p>
+    </details>
+
+  </section>
+</main>
+
+<script type="module" src="js/pagina-melhorar.js"></script>
+
+</body>
+</html>

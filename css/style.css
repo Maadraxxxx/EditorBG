@@ -136,9 +136,11 @@ main {
 
 .home-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* 260 e nao 300: com tres cards, 300 forcava uma coluna sozinha embaixo em
+     telas medias. 260 deixa os tres lado a lado a partir de ~840px. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
-  max-width: 880px;
+  max-width: 1080px;
   width: 100%;
   margin: 0 auto;
 }
@@ -171,6 +173,7 @@ main {
   box-shadow: 0 8px 22px rgba(79, 70, 229, .38);
 }
 .home-icon-edit { background: linear-gradient(135deg, var(--accent-2), #0891b2); box-shadow: 0 8px 22px rgba(8, 145, 178, .38); }
+.home-icon-mq { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1f1300; }
 
 .home-card h3 { margin: 0 0 8px; font-size: 19px; letter-spacing: -.2px; }
 .home-card > p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.55; }
@@ -1856,4 +1859,120 @@ body[data-mode="editor"] .conteudo {
   padding-left: clamp(16px, 4vw, 48px);
   padding-right: clamp(16px, 4vw, 48px);
   padding-bottom: 64px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Página "Melhorar qualidade"
+ * ------------------------------------------------------------------ */
+.mq {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  margin-top: 22px;
+  align-items: start;
+}
+
+.mq-palco {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+/* O xadrez atrás mostra transparência, se a imagem tiver. */
+.mq-comparar {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  background:
+    linear-gradient(45deg, #1a2237 25%, transparent 25%, transparent 75%, #1a2237 75%) 0 0 / 20px 20px,
+    linear-gradient(45deg, #1a2237 25%, #141a2b 25%, #141a2b 75%, #1a2237 75%) 10px 10px / 20px 20px;
+}
+.mq-comparar img { display: block; width: 100%; height: auto; }
+
+/* A metade "antes" fica por cima, recortada pela largura da caixa. */
+.mq-antes-caixa {
+  position: absolute; inset: 0;
+  width: 50%;
+  overflow: hidden;
+  border-right: 1px solid rgba(255, 255, 255, .35);
+}
+.mq-antes-caixa img {
+  /* A imagem dentro precisa manter a largura do palco inteiro, senão ela
+     encolheria junto com a caixa e as duas metades não bateriam. */
+  position: absolute; top: 0; left: 0;
+  width: auto; height: 100%;
+  max-width: none;
+}
+.mq-tag {
+  position: absolute; left: 10px; top: 10px;
+  background: rgba(6, 9, 16, .78);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px; font-weight: 600;
+  color: var(--txt);
+}
+
+.mq-alca {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(6, 9, 16, .8);
+  border: 1px solid rgba(255, 255, 255, .35);
+  color: #fff; font-size: 13px;
+  pointer-events: none;
+}
+
+.mq-dica { margin: 10px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+/* ---- coluna da direita ---- */
+.mq-lado { display: grid; gap: 14px; }
+
+.mq-info { display: grid; gap: 2px; }
+.mq-nome {
+  font-size: 13.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mq-medidas { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.mq-bloco {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+.mq-titulo {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .6px;
+  color: var(--muted);
+}
+.mq-nota { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--muted); }
+
+.mq-barra {
+  height: 6px;
+  background: #0b1020;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.mq-barra > div {
+  height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width .25s;
+}
+
+.mq-baixar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mq-baixar .btn { justify-content: center; }
+
+.mq-lado > .link-botao { justify-self: center; }
+
+@media (max-width: 860px) {
+  .mq { grid-template-columns: minmax(0, 1fr); }
 }
