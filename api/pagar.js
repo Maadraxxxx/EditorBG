@@ -16,8 +16,9 @@
  *   MP_ACCESS_TOKEN            Access Token do Mercado Pago
  *   SUPABASE_URL               URL do projeto Supabase
  *   SUPABASE_SERVICE_ROLE_KEY  service_role key — NUNCA vá para o navegador
- *   SITE_URL                   endereço público do site
  *   PRECO_VIP                  valor em reais (ex.: 19.90)
+ *   SITE_URL                   opcional. Se estiver ausente ou torto, o
+ *                              endereço sai dos cabeçalhos da requisição.
  */
 
 export default async function handler(req, res) {
@@ -30,10 +31,9 @@ export default async function handler(req, res) {
   const mpToken = process.env.MP_ACCESS_TOKEN;
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const siteUrl = process.env.SITE_URL;
   const preco = Number(process.env.PRECO_VIP || '19.90');
 
-  if (!mpToken || !supabaseUrl || !serviceKey || !siteUrl) {
+  if (!mpToken || !supabaseUrl || !serviceKey) {
     return res.status(500).json({ ok: false, motivo: 'Servidor sem as variáveis de ambiente configuradas.' });
   }
 
@@ -62,7 +62,6 @@ export default async function handler(req, res) {
     // valor e destinatário são nossos, não do navegador
     transaction_amount: preco,
     external_reference: usuario.id,
-    notification_url: siteUrl.replace(/\/$/, '') + '/api/webhook-mp',
     description: 'EditorBG VIP — acesso vitalício',
 
     // o que o Brick coletou
@@ -79,6 +78,14 @@ export default async function handler(req, res) {
   if (form.token) pagamento.token = form.token;
   if (form.installments) pagamento.installments = Number(form.installments);
   if (form.issuer_id) pagamento.issuer_id = form.issuer_id;
+
+  // O aviso de "pagamento aprovado" volta para cá. Só vai junto se o endereço
+  // for utilizável: o Mercado Pago recusa o pagamento inteiro se este campo
+  // estiver torto, e ficar sem liberação automática é bem melhor do que ficar
+  // sem venda.
+  const avisoEm = enderecoDoWebhook(req);
+  if (avisoEm) pagamento.notification_url = avisoEm;
+  else console.warn('Sem notification_url utilizável: o VIP não vai liberar sozinho.');
 
   /* ---- cria no Mercado Pago ---- */
   let criado;
@@ -123,4 +130,51 @@ export default async function handler(req, res) {
         }
       : null,
   });
+}
+
+/**
+ * Endereço público do webhook.
+ *
+ * Nasceu de um erro chato de diagnosticar: o Mercado Pago recusava o pagamento
+ * inteiro com "notificaction_url attribute must be url valid" (o erro de
+ * digitação é deles) porque SITE_URL estava sem o `https://` na frente. O
+ * campo torto derrubava a venda, e a mensagem não dizia de onde vinha.
+ *
+ * A correção foi parar de depender de alguém digitar certo. O servidor já sabe
+ * o próprio endereço — a Vercel o informa em cada requisição — então o valor
+ * digitado à mão virou apenas a primeira opção, usada só se for mesmo uma URL.
+ *
+ * Devolve string vazia quando não dá para montar um endereço que o Mercado
+ * Pago aceite. Localhost entra nesse caso: eles precisam alcançar a URL de
+ * fora, e nenhuma máquina de desenvolvimento está exposta.
+ */
+export function enderecoDoWebhook(req) {
+  const candidatos = [];
+
+  const declarado = String(process.env.SITE_URL || '').trim();
+  if (declarado) candidatos.push(declarado);
+
+  // Como a Vercel se apresenta. É o valor em que dá para confiar mais, porque
+  // ninguém digita: vem do próprio roteamento da requisição.
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (host) candidatos.push((req.headers['x-forwarded-proto'] || 'https') + '://' + host);
+
+  for (const bruto of candidatos) {
+    // Sem protocolo, `new URL` não aceita — e é justamente o engano mais comum.
+    const texto = /^https?:\/\//i.test(bruto) ? bruto : 'https://' + bruto;
+    let url;
+    try {
+      url = new URL(texto);
+    } catch {
+      continue;
+    }
+
+    if (url.protocol !== 'https:') continue;
+    if (/^(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test(url.hostname)) continue;
+    if (!url.hostname.includes('.')) continue;
+
+    return 'https://' + url.host + '/api/webhook-mp';
+  }
+
+  return '';
 }
