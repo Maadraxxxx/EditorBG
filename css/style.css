@@ -1691,127 +1691,6 @@ th.admin-c { text-align: center; }
 }
 
 /* ------------------------------------------------------------------ *
- * Texto das páginas
- * ------------------------------------------------------------------ *
- * Fica abaixo da ferramenta. Quem chegou para usar o site clica e vai
- * embora sem ler nada; quem chegou pela busca encontra a resposta.
- */
-.conteudo {
-  width: min(760px, 100%);
-  margin: 64px auto 0;
-  padding: 0 clamp(16px, 4vw, 24px) 72px;
-  line-height: 1.75;
-  color: #b9c4da;
-  font-size: 15.5px;
-}
-
-.conteudo h2 {
-  margin: 48px 0 14px;
-  font-size: 22px;
-  line-height: 1.3;
-  color: var(--txt);
-  letter-spacing: -.2px;
-}
-.conteudo h2:first-child { margin-top: 0; }
-
-.conteudo h3 {
-  margin: 30px 0 8px;
-  font-size: 16.5px;
-  color: var(--txt);
-}
-
-.conteudo p { margin: 0 0 16px; }
-.conteudo strong { color: var(--txt); }
-.conteudo em { color: #cfd8ea; font-style: normal; font-weight: 600; }
-
-.conteudo kbd {
-  background: #0b1020;
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  padding: 1px 6px;
-  font: inherit; font-size: 12.5px;
-  color: var(--txt);
-}
-
-/* ---- lista numerada com o número em destaque ---- */
-.conteudo-passos {
-  list-style: none;
-  counter-reset: passo;
-  margin: 0 0 18px;
-  padding: 0;
-  display: grid;
-  gap: 14px;
-}
-.conteudo-passos li {
-  counter-increment: passo;
-  position: relative;
-  padding-left: 44px;
-}
-.conteudo-passos li::before {
-  content: counter(passo);
-  position: absolute;
-  left: 0; top: 1px;
-  width: 28px; height: 28px;
-  display: grid; place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #4f46e5);
-  color: #fff;
-  font-size: 13px; font-weight: 700;
-}
-
-.conteudo-lista { margin: 0 0 18px; padding-left: 22px; display: grid; gap: 9px; }
-.conteudo-lista li::marker { color: var(--accent-2); }
-
-/* ---- a ressalva honesta, marcada para não parecer propaganda ---- */
-.conteudo-honesto {
-  border-left: 2px solid rgba(245, 158, 11, .5);
-  background: rgba(245, 158, 11, .05);
-  border-radius: 0 10px 10px 0;
-  padding: 13px 16px;
-  font-size: 14.5px;
-}
-
-/* ---- perguntas frequentes, sem JavaScript ---- */
-.faq {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  margin-bottom: 9px;
-  background: rgba(255, 255, 255, .015);
-  overflow: hidden;
-}
-.faq summary {
-  cursor: pointer;
-  padding: 14px 46px 14px 18px;
-  font-size: 15px; font-weight: 600;
-  color: var(--txt);
-  list-style: none;
-  position: relative;
-  transition: background .15s;
-}
-.faq summary::-webkit-details-marker { display: none; }
-.faq summary:hover { background: rgba(255, 255, 255, .03); }
-.faq summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
-
-.faq summary::after {
-  content: '';
-  position: absolute;
-  right: 20px; top: 50%;
-  width: 8px; height: 8px;
-  border-right: 2px solid var(--muted);
-  border-bottom: 2px solid var(--muted);
-  transform: translateY(-70%) rotate(45deg);
-  transition: transform .2s;
-}
-.faq[open] summary::after { transform: translateY(-20%) rotate(-135deg); }
-.faq[open] summary { color: var(--accent-2); }
-
-.faq p { margin: 0; padding: 0 18px 16px; font-size: 14.5px; }
-
-/* Na página do editor o texto só aparece enquanto não há imagem aberta. */
-body.com-imagem .conteudo { display: none; }
-
-/* ------------------------------------------------------------------ *
  * Página do editor com o texto abaixo
  * ------------------------------------------------------------------ *
  * O editor é `position: fixed`, o que o tira do fluxo — texto colocado
@@ -1826,3 +1705,169 @@ body.com-imagem .conteudo { display: none; }
 
 /* Com imagem aberta o editor volta a cobrir a tela e o texto some. */
 body.com-imagem .editor { position: fixed; inset: 0; }
+
+/* ------------------------------------------------------------------ *
+ * Texto das páginas
+ * ------------------------------------------------------------------ *
+ * TRÊS DECISÕES QUE DEFINEM O VISUAL AQUI:
+ *
+ * 1. Largura herdada, não inventada. A primeira versão tinha 760px próprios
+ *    e centrados, então a borda esquerda do texto não batia com a da
+ *    ferramenta logo acima — o que faz a página parecer montada por duas
+ *    pessoas diferentes. Agora o bloco ocupa a largura do container e cada
+ *    parágrafo é limitado por medida de leitura, alinhado à esquerda.
+ *
+ * 2. Discreto. É material de apoio, não a razão de a pessoa estar aqui: fonte
+ *    menor, contraste menor, títulos sem peso de manchete.
+ *
+ * 3. Separado por uma linha e um rótulo, para ler como seção deliberada e não
+ *    como texto que sobrou embaixo da página.
+ */
+.conteudo {
+  margin-top: 56px;
+  padding-top: 34px;
+  border-top: 1px solid var(--line);
+  color: #93a0ba;
+  font-size: 14.5px;
+  line-height: 1.72;
+}
+
+/* Rótulo pequeno em cima da linha, como as seções do painel. */
+.conteudo::before {
+  content: 'Sobre o EditorBG';
+  display: block;
+  margin-bottom: 26px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: #5d6b88;
+}
+
+/* Medida de leitura sem centralizar: a borda esquerda continua batendo com
+   tudo o que está acima. */
+.conteudo > * { max-width: 70ch; }
+
+.conteudo h2 {
+  margin: 38px 0 12px;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: #dbe3f2;
+  letter-spacing: -.1px;
+}
+.conteudo h3 {
+  margin: 24px 0 6px;
+  font-size: 14.5px;
+  font-weight: 650;
+  color: #c3cee2;
+}
+.conteudo p { margin: 0 0 14px; }
+.conteudo strong { color: #cfd8ea; font-weight: 600; }
+.conteudo em { color: #c3cee2; font-style: normal; font-weight: 600; }
+.conteudo a { color: var(--accent-2); text-decoration: none; border-bottom: 1px solid rgba(34, 211, 238, .3); }
+.conteudo a:hover { border-bottom-color: var(--accent-2); }
+
+.conteudo kbd {
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 5px;
+  font: inherit; font-size: 12px;
+  color: #c3cee2;
+}
+
+/* ---- passos numerados, discretos ---- */
+.conteudo-passos {
+  list-style: none;
+  counter-reset: passo;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 11px;
+}
+.conteudo-passos li {
+  counter-increment: passo;
+  position: relative;
+  padding-left: 30px;
+}
+.conteudo-passos li::before {
+  content: counter(passo) '.';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.conteudo-lista { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 8px; }
+.conteudo-lista li::marker { color: #4a5878; }
+
+/* ---- a ressalva honesta: marcada, mas sem gritar ---- */
+.conteudo-honesto {
+  border-left: 2px solid rgba(245, 158, 11, .35);
+  padding-left: 14px;
+  color: #8a94ab;
+  font-size: 14px;
+}
+
+/* ---- perguntas frequentes: linhas finas, não caixas ---- */
+.faq {
+  border-bottom: 1px solid rgba(38, 49, 73, .7);
+  max-width: 70ch;
+}
+.faq:first-of-type { border-top: 1px solid rgba(38, 49, 73, .7); }
+
+.faq summary {
+  cursor: pointer;
+  padding: 13px 34px 13px 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #c3cee2;
+  list-style: none;
+  position: relative;
+  transition: color .15s;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary:hover { color: var(--txt); }
+.faq summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 4px; }
+
+.faq summary::after {
+  content: '';
+  position: absolute;
+  right: 6px; top: 50%;
+  width: 7px; height: 7px;
+  border-right: 1.5px solid #5d6b88;
+  border-bottom: 1.5px solid #5d6b88;
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform .2s;
+}
+.faq[open] summary::after { transform: translateY(-25%) rotate(-135deg); }
+.faq[open] summary { color: var(--txt); }
+
+.faq p { margin: 0; padding: 0 0 16px; font-size: 14px; }
+
+/* Na home o texto acompanha a largura dos dois cards, não a do container
+   inteiro — senão começaria antes deles.
+
+   `width: 100%` junto com o `margin-inline: auto` não é redundância: dentro de
+   um container flex, margem automática sozinha encolhe o item até o tamanho do
+   conteúdo. Sem essa linha o bloco ficava com 547px em vez de 880 e voltava a
+   não bater com os cards. É o mesmo par que .home-cards já usava. */
+.home .conteudo {
+  width: 100%;
+  max-width: 880px;
+  margin-inline: auto;
+}
+
+/* Na página do editor o texto é filho direto do <body>: não existe o <main>
+   para dar largura e respiro lateral, então ele recria os dois. Sem isso o
+   texto encostava nas bordas da janela. */
+body[data-mode="editor"] .conteudo {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-left: clamp(16px, 4vw, 48px);
+  padding-right: clamp(16px, 4vw, 48px);
+  padding-bottom: 64px;
+}
