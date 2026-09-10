@@ -1,5 +1,17 @@
 -- Cargo de administrador, registro de pagamentos e contagem de visitas.
 -- Aplicada com: supabase db push
+--
+-- NOTA SOBRE O NUMERO DESTE ARQUIVO
+-- O banco tem tres migracoes que nao existem como arquivo aqui
+-- (resumo_admin, visitantes_unicos, resumo_admin_assinaturas_do_mes): foram
+-- aplicadas uma a uma enquanto o painel era construido, e o efeito das tres
+-- esta consolidado neste arquivo. O nome dele foi alinhado com a versao que o
+-- banco registrou, de proposito: com um numero que o banco nao conhecesse, um
+-- `supabase db push` tentaria aplica-lo de novo e o `create or replace
+-- function resumo_admin` daqui sobrescreveria a versao mais nova, que vem em
+-- 20260910012905_planos_com_validade.sql.
+--
+-- Para um banco vazio, aplicar os arquivos em ordem produz o estado atual.
 
 /* ------------------------------------------------------------------ *
  * 1. Cargo e presença no perfil
