@@ -428,3 +428,23 @@ Duas coisas nele que não são óbvias:
   conseguiria pagar.
 - `trailingSlash: false` evita que `/remover-fundo` e `/remover-fundo/` virem
   dois endereços com o mesmo conteúdo, o que confunde buscador.
+
+## Cada módulo traz a própria tela
+
+`js/conta-ui.js` injeta `partials/conta.html`; `js/paywall.js` injeta
+`partials/paywall.html`. Quem importa o módulo ganha o markup junto, sem
+precisar lembrar de colar nada no HTML da página.
+
+Isso nasceu de um bug: "Conhecer o VIP" não fazia nada na home. O markup do
+paywall morava dentro de `partials/editor.html`, e a home não carrega o editor
+— então o modal não existia ali. Pior, o botão disparava um `CustomEvent` que
+só era ouvido por `app.js` e `editar.js`, então mesmo com markup não haveria
+quem respondesse.
+
+Os dois eventos (`abrir-conta` e `mostrar-vip`) foram embora. Cada módulo chama
+o outro por **import dinâmico** — nunca estático, porque os dois se chamam
+mutuamente e um ciclo com `await` no topo travaria os dois.
+
+A regra que sobra: se um botão precisa de uma tela, o módulo dele traz a tela.
+Espalhar markup por páginas e ouvintes por arquivos é o que fazia o mesmo botão
+funcionar em duas páginas e falhar em silêncio numa terceira.

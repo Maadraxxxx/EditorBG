@@ -5,11 +5,12 @@
  */
 import { compose, cloneCanvas, defaultEdit } from './compose.js';
 import { openEditor } from './editor.js';
-import { baixar as baixarComPlano, abrirPaywall } from './paywall.js';
+import { baixar as baixarComPlano } from './paywall.js';
 import './conta-ui.js';
 
-document.addEventListener('abrir-conta', () => import('./conta-ui.js').then((m) => m.abrir(true)));
-document.addEventListener('mostrar-vip', () => abrirPaywall(null, null));
+// Os eventos 'abrir-conta' e 'mostrar-vip' foram embora: cada módulo agora
+// chama o outro direto. Eram ouvidos só aqui e em editar.js, o que fazia os
+// mesmos botões não funcionarem na home.
 import { refreshSliders } from './sliders.js';
 
 const $ = (id) => document.getElementById(id);

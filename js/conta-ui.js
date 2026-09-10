@@ -236,9 +236,12 @@ $('contaSair').addEventListener('click', async () => {
   fechar();
 });
 
-$('contaVerVip').addEventListener('click', () => {
+$('contaVerVip').addEventListener('click', async () => {
   fechar();
-  document.dispatchEvent(new CustomEvent('mostrar-vip'));
+  // Chamar direto em vez de disparar um evento: o evento só era ouvido por
+  // app.js e editar.js, então na home o clique não fazia nada.
+  const Paywall = await import('./paywall.js');
+  Paywall.abrirPaywall(null, null);
 });
 
 function mostrar(texto, tipo) {

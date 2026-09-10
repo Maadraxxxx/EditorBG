@@ -9,6 +9,14 @@ import {
 import { PLANOS, ORDEM, PLANO_PADRAO, plano, precoEscrito } from './planos.js';
 import * as Conta from './conta.js';
 
+// A tela vem junto com o módulo. Antes o markup morava no partial do editor, e
+// o resultado era que "Conhecer o VIP" não fazia nada na home: a página não
+// carrega o editor, então o modal simplesmente não existia ali.
+if (!document.getElementById('modalHD')) {
+  const url = new URL('../partials/paywall', import.meta.url);
+  document.body.insertAdjacentHTML('beforeend', await fetch(url).then((r) => r.text()));
+}
+
 export { aplicarLimite };
 
 /** VIP libera resolução original e o recorte em duas passadas. */
@@ -247,7 +255,9 @@ function liberado() {
 
 $('hdEntrar').addEventListener('click', () => {
   fechar();
-  document.dispatchEvent(new CustomEvent('abrir-conta'));
+  // Import sob demanda, não estático: conta-ui.js também chama daqui, e um
+  // ciclo entre os dois com await no topo travaria os dois módulos.
+  import('./conta-ui.js').then((m) => m.abrir(true));
 });
 
 /* ------------------------------------------------------------------ *

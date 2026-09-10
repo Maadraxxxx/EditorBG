@@ -673,8 +673,9 @@ function refletirPlano() {
 
 Conta.aoMudar(refletirPlano);
 document.addEventListener('vip-mudou', refletirPlano);
-document.addEventListener('abrir-conta', () => import('./conta-ui.js').then((m) => m.abrir(true)));
-document.addEventListener('mostrar-vip', () => abrirPaywall(null, null));
+// Os eventos 'abrir-conta' e 'mostrar-vip' foram embora: cada módulo agora
+// chama o outro direto. Eram ouvidos só aqui e em editar.js, o que fazia os
+// mesmos botões não funcionarem na home.
 
 if (modelHint) modelHint.textContent = MODELS[modelKey].descricao;
 
