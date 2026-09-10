@@ -12,7 +12,7 @@
 
 <script type="module">
   // O editor ocupa a página inteira: injeta o markup e entrega o controle a editar.js.
-  const html = await fetch('partials/editor.html').then((r) => r.text());
+  const html = await fetch('partials/editor').then((r) => r.text());
   document.body.insertAdjacentHTML('beforeend', html);
   await import('./js/editar.js');
 </script>

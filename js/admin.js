@@ -10,6 +10,7 @@
  * simplesmente não chegam.
  */
 import * as Conta from './conta.js';
+import { plano as buscarPlano, vipAtivo } from './planos.js';
 import './conta-ui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -69,7 +70,8 @@ async function carregarResumo() {
   $('numOnline').textContent = numero.format(r.online);
 
   $('numAssinaturas').textContent = numero.format(r.assinaturas);
-  $('numVips').textContent = plural(r.vips, 'conta com VIP ativo', 'contas com VIP ativo');
+  $('numVips').textContent = plural(r.vips, 'conta com VIP ativo', 'contas com VIP ativo')
+    + (r.vipsVencidos ? ' · ' + plural(r.vipsVencidos, 'vencida', 'vencidas') : '');
 
   $('numFaturadoMes').textContent = dinheiro.format(r.faturadoMes);
   $('numAssinaturasMes').textContent = plural(r.assinaturasMes, 'assinatura', 'assinaturas');
@@ -137,6 +139,8 @@ function desenharLista(pessoas) {
     tdVisto.textContent = faz(p.ultimo_acesso);
     tr.append(tdVisto);
 
+    tr.append(celulaPlano(p));
+
     tr.append(celulaChave(p, 'vip', p.vip, false));
     // Ninguém tira o próprio cargo: o servidor recusa, e deixar o botão clicável
     // só entregaria um erro. Melhor já vir travado.
@@ -144,6 +148,37 @@ function desenharLista(pessoas) {
 
     corpo.append(tr);
   }
+}
+
+/** O selo do plano: qual e, e ate quando vale. */
+function celulaPlano(pessoa) {
+  const td = document.createElement('td');
+  if (!pessoa.vip) { td.textContent = '—'; return td; }
+
+  const selo = document.createElement('span');
+  selo.className = 'admin-plano';
+
+  const vencido = !vipAtivo(pessoa);
+  const conhecido = buscarPlano(pessoa.plano);
+
+  if (pessoa.plano === 'cortesia') {
+    selo.textContent = 'Cortesia';
+    selo.classList.add('e-vitalicio');
+  } else if (!pessoa.vip_ate) {
+    selo.textContent = conhecido ? conhecido.nome : 'Vitalício';
+    selo.classList.add('e-vitalicio');
+  } else {
+    const dia = new Date(pessoa.vip_ate).toLocaleDateString('pt-BR');
+    selo.textContent = (conhecido ? conhecido.nome : 'Plano') + ' · ' + (vencido ? 'venceu ' : 'até ') + dia;
+    if (vencido) selo.classList.add('e-vencido');
+  }
+
+  // O interruptor ao lado continua ligado num plano vencido, porque a coluna
+  // `vip` no banco continua true. O selo e o que conta a verdade.
+  selo.title = vencido ? 'A assinatura venceu: esta conta nao tem mais acesso VIP.' : '';
+
+  td.append(selo);
+  return td;
 }
 
 function celulaChave(pessoa, campo, ligado, travado) {

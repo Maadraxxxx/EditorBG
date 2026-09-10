@@ -10,6 +10,8 @@
  * apenas sem contas e sempre no plano grátis.
  */
 
+import { vipAtivo, plano as buscarPlano } from './planos.js';
+
 /* ------------------------------------------------------------------ *
  * Projeto Supabase
  * ------------------------------------------------------------------ */
@@ -88,8 +90,25 @@ export function estaLogado() {
   return !!sessao;
 }
 
+/**
+ * Tem VIP valendo AGORA.
+ *
+ * A coluna `vip` sozinha nao serve: ela continua true depois do vencimento,
+ * porque nada roda de tempos em tempos para virar a chave. Quem decide e a
+ * data em `vip_ate` — e null ali significa vitalicio, nao "sem acesso".
+ */
 export function ehVip() {
-  return !!(perfil && perfil.vip);
+  return vipAtivo(perfil);
+}
+
+/** Ate quando vale. null = vitalicio; undefined = nao tem plano. */
+export function vipAte() {
+  return ehVip() ? (perfil.vip_ate || null) : undefined;
+}
+
+/** O plano comprado, para a tela mostrar o nome. */
+export function planoAtual() {
+  return ehVip() && perfil.plano ? buscarPlano(perfil.plano) : undefined;
 }
 
 /**
@@ -145,7 +164,7 @@ async function carregarPerfil() {
   if (!sessao) { perfil = null; return; }
   const { data, error } = await cliente
     .from('perfis')
-    .select('vip, admin, email')
+    .select('vip, vip_ate, plano, admin, email')
     .eq('id', sessao.user.id)
     .maybeSingle();
   if (error) console.warn('Não deu para ler o perfil:', error.message);

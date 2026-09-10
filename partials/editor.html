@@ -43,7 +43,12 @@
       <li>Sem limite de imagens</li>
     </ul>
 
-    <div class="hd-preco"><span id="hdPreco">—</span><small id="hdPlano"></small></div>
+    <!-- Os cartões são montados por js/paywall.js a partir de js/planos.js, a
+         mesma tabela que o servidor usa para cobrar. Escrever os preços aqui
+         no HTML criaria um terceiro lugar para eles ficarem desatualizados. -->
+    <div class="hd-planos" id="hdPlanos" role="radiogroup" aria-label="Escolha o plano"></div>
+
+    <p class="hd-renova" id="hdRenova" hidden></p>
 
     <button class="btn primary full" id="hdEntrar" hidden>Entrar para assinar</button>
     <button class="btn primary full" id="hdPagar">Assinar agora</button>
@@ -80,7 +85,7 @@
 <div class="editor" id="editor" hidden>
   <header class="ed-top">
     <div class="ed-title">
-      <a class="ed-home" id="edHome" href="index.html" title="Voltar para o início" hidden>
+      <a class="ed-home" id="edHome" href="/" title="Voltar para o início" hidden>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
         Início

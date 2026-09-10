@@ -335,3 +335,71 @@ update public.perfis set admin = true where email = 'seu@email.com';
 
 Depois disso o painel se vira sozinho. Um admin não consegue tirar o próprio
 cargo, para que o painel nunca fique sem ninguém que entre.
+
+## Os três planos
+
+Ficam em [js/planos.js](js/planos.js), importado pelo navegador **e** pelas
+funções em `api/`:
+
+| Plano | Preço | Duração |
+|---|---|---|
+| 1 mês | R$ 4,90 | 1 mês |
+| 3 meses | R$ 12,90 | 3 meses |
+| Vitalício | R$ 19,90 | não expira |
+
+Um arquivo só, dos dois lados, de propósito. Com duas listas separadas, mudar
+um preço em apenas um lugar faria a pessoa ver R$ 4,90 na tela e ser cobrada
+outra coisa — o tipo de bug que só aparece depois de alguém pagar errado.
+
+Isso não substitui a regra de sempre: **o navegador escolhe um plano, nunca um
+preço**. `api/pagar.js` recebe o id e busca o valor na tabela dele. O Brick
+manda `transaction_amount` no formulário e esse campo é ignorado.
+
+### VIP com prazo
+
+`perfis.vip` sozinho não responde mais se alguém tem acesso — ele continua
+`true` depois do vencimento, porque nada roda de tempos em tempos para virar a
+chave. Quem decide é `vip_ate`:
+
+```
+vip = true,  vip_ate = null        → vitalício
+vip = true,  vip_ate > agora       → assinatura valendo
+vip = true,  vip_ate <= agora      → venceu, sem acesso
+```
+
+A conta está em `vipAtivo()`, usada no navegador, e repetida em SQL dentro de
+`resumo_admin()` para o painel não contar assinatura vencida como ativa.
+
+### Duas regras que parecem detalhe
+
+**Renovar soma.** Quem tem 3 meses e renova no segundo mês não perde o que
+falta por ter renovado cedo — o tempo novo entra em cima do que resta.
+
+**Vitalício nunca vira prazo.** Se quem já tem vitalício comprar um mensal por
+engano, a validade não é mexida. Trocar "nunca expira" por "expira em 30 dias"
+seria tirar algo que a pessoa já pagou.
+
+### De qual plano foi um pagamento
+
+O plano viaja em `metadata`, mas quem decide é o **valor pago**. Metadata é um
+campo que acompanha o pagamento; o dinheiro que entrou é o pagamento. Se os
+dois discordarem, vale o valor — entregar 3 meses para quem pagou R$ 4,90 seria
+pior do que ignorar o campo.
+
+### Cortesia
+
+VIP ligado à mão pelo painel entra como `plano = 'cortesia'` e sem validade.
+Não vence, e não soma no faturamento — só pagamento de verdade soma.
+
+## Testes
+
+Não precisam de banco, de chave nem de internet — o `fetch` é trocado por um
+dublê. Rodam com o Node instalado:
+
+```bash
+node testes/planos.mjs && node testes/admin.mjs
+```
+
+`planos.mjs` cobre preço, validade, renovação, o pulo de calendário de 31/01 e
+a recusa de um valor vindo do navegador. `admin.mjs` cobre quem entra e quem
+não entra no painel.

@@ -16,6 +16,9 @@
  *   SUPABASE_SERVICE_ROLE_KEY  service_role key — NUNCA vá para o navegador
  */
 
+import { liberarPlano } from './_supabase.js';
+import { planoDoPagamento } from '../js/planos.js';
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -80,6 +83,10 @@ export default async function handler(req, res) {
     return res.status(402).json({ ok: false, motivo: motivos[pagamento.status] || 'Pagamento não aprovado.' });
   }
 
+  // Declarado aqui fora porque o registro do pagamento, mais abaixo, precisa
+  // dele depois que o try acabar.
+  let planoId;
+
   /* ---- 3. esse pagamento já liberou alguma conta? ---- */
   const cabecalhos = {
     apikey: serviceKey,
@@ -98,12 +105,15 @@ export default async function handler(req, res) {
     }
 
     /* ---- 4. promove ---- */
-    const r = await fetch(supabaseUrl + '/rest/v1/perfis?id=eq.' + usuario.id, {
-      method: 'PATCH',
-      headers: { ...cabecalhos, Prefer: 'return=representation' },
-      body: JSON.stringify({ vip: true, pagamento_id: pagamentoId, atualizado_em: new Date().toISOString() }),
+    // Mesma funcao que o webhook usa. Dois caminhos que liberam o mesmo VIP
+    // precisam calcular o prazo igual, senao o resultado depende de por onde
+    // a pessoa passou.
+    planoId = planoDoPagamento(pagamento);
+
+    await liberarPlano(usuario.id, planoId, pagamentoId, {
+      url: supabaseUrl.replace(/\/$/, ''),
+      chave: serviceKey,
     });
-    if (!r.ok) throw new Error('PATCH ' + r.status + ' ' + (await r.text()));
   } catch (err) {
     console.error('Falha ao gravar o plano:', err);
     return res.status(500).json({ ok: false, motivo: 'Pagamento confirmado, mas falhou ao liberar o plano. Fale com o suporte.' });
@@ -120,6 +130,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         id: pagamentoId,
         usuario_id: usuario.id,
+        plano: planoId,
         email: (pagamento.payer && pagamento.payer.email) || usuario.email || null,
         valor: pagamento.transaction_amount || 0,
         moeda: pagamento.currency_id || 'BRL',

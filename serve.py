@@ -8,12 +8,28 @@ continua vendo a versão antiga. Aqui todo arquivo vai com `no-store`.
 Uso:  python serve.py [porta]
 """
 import http.server
+import os
 import sys
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 5180
 
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        """
+        Serve /remover-fundo lendo remover-fundo.html.
+
+        A Vercel faz isso em producao (cleanUrls no vercel.json). Sem o mesmo
+        comportamento aqui, o site testado na maquina e o publicado seriam dois
+        sites diferentes — e a diferenca so apareceria depois do deploy.
+        """
+        destino = super().translate_path(path)
+        if (not os.path.splitext(destino)[1]
+                and not os.path.isdir(destino)
+                and os.path.isfile(destino + ".html")):
+            return destino + ".html"
+        return destino
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         self.send_header("Pragma", "no-cache")

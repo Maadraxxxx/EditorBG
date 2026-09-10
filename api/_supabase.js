@@ -1,5 +1,7 @@
+import { novaValidade } from '../js/planos.js';
+
 /**
- * Pedaços que api/admin.js e api/presenca.js usam do mesmo jeito.
+ * Pedaços que as funções em api/ usam do mesmo jeito.
  *
  * O nome começa com "_" de propósito: a Vercel não transforma esses arquivos
  * em endereços públicos, então isto aqui é biblioteca, não rota.
@@ -134,6 +136,57 @@ export async function lerCargo(id, env) {
   const linhas = await r.json();
   if (!linhas.length) return { achou: false };
   return { achou: true, admin: linhas[0].admin === true, email: linhas[0].email };
+}
+
+/**
+ * Liga o VIP e calcula ate quando vale.
+ *
+ * Usada pelo webhook e pela conferencia manual, que precisam fazer exatamente
+ * a mesma coisa — e onde divergir significaria alguem pagando e recebendo
+ * prazo diferente dependendo do caminho.
+ *
+ * DUAS REGRAS QUE PARECEM DETALHE E NAO SAO:
+ *
+ *   Renovar SOMA. Quem tem 3 meses e renova no segundo mes nao pode perder o
+ *   que falta por ter renovado cedo.
+ *
+ *   Vitalicio nunca vira prazo. Se quem ja tem vitalicio comprar um mensal por
+ *   engano, o certo e nao mexer na validade — trocar "nunca expira" por "expira
+ *   em 30 dias" seria tirar da pessoa algo que ela ja pagou.
+ */
+export async function liberarPlano(usuarioId, planoId, pagamentoId, env) {
+  const r = await fetch(
+    env.url + '/rest/v1/perfis?select=vip,vip_ate&id=eq.' + encodeURIComponent(usuarioId),
+    { headers: cabecalhos(env.chave) }
+  );
+  const linhas = r.ok ? await r.json() : [];
+  const atual = linhas[0] || {};
+
+  let ate;
+  if (atual.vip && atual.vip_ate === null) {
+    ate = null;                                   // ja e vitalicio: fica como esta
+  } else {
+    ate = novaValidade(planoId, atual.vip_ate);
+    if (ate === undefined) throw new Error('Plano desconhecido: ' + planoId);
+  }
+
+  const gravou = await fetch(
+    env.url + '/rest/v1/perfis?id=eq.' + encodeURIComponent(usuarioId),
+    {
+      method: 'PATCH',
+      headers: cabecalhos(env.chave, { Prefer: 'return=representation' }),
+      body: JSON.stringify({
+        vip: true,
+        vip_ate: ate,
+        plano: planoId,
+        pagamento_id: pagamentoId,
+        atualizado_em: new Date().toISOString(),
+      }),
+    }
+  );
+  if (!gravou.ok) throw new Error('PATCH ' + gravou.status + ' ' + (await gravou.text()));
+
+  return { ate };
 }
 
 export async function rpc(nome, corpo, env) {

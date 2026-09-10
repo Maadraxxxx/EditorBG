@@ -7,7 +7,7 @@ import * as Conta from './conta.js';
 // A tela vem junto com o modulo: assim a home, que nao carrega o editor,
 // ganha o botao de conta so por importar este arquivo.
 if (!document.getElementById('modalConta')) {
-  const url = new URL('../partials/conta.html', import.meta.url);
+  const url = new URL('../partials/conta', import.meta.url);
   document.body.insertAdjacentHTML('beforeend', await fetch(url).then((r) => r.text()));
 }
 

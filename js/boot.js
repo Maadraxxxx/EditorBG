@@ -4,8 +4,8 @@
  * importação precisa vir depois da injeção — por isso é dinâmica.
  */
 export async function boot() {
-  const html = await fetch('partials/editor.html').then((r) => {
-    if (!r.ok) throw new Error('não foi possível carregar partials/editor.html');
+  const html = await fetch('partials/editor').then((r) => {
+    if (!r.ok) throw new Error('não foi possível carregar partials/editor');
     return r.text();
   });
   document.body.insertAdjacentHTML('beforeend', html);

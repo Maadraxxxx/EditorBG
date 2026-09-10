@@ -1516,3 +1516,94 @@ th.admin-c { text-align: center; }
 
 /* A tabela é apertada; centraliza o interruptor na célula. */
 .admin-tabela .switch { display: inline-flex; vertical-align: middle; }
+
+/* ------------------------------------------------------------------ *
+ * Escolha de plano no paywall
+ * ------------------------------------------------------------------ */
+.hd-planos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 9px;
+  margin: 18px 0 4px;
+}
+
+.hd-plano {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 14px 8px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .01));
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .16s, background .16s, transform .14s;
+}
+.hd-plano:hover { border-color: #3b4a6b; transform: translateY(-1px); }
+.hd-plano:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+.hd-plano-nome {
+  font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.hd-plano-valor {
+  font-size: 20px; font-weight: 700; color: var(--txt);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.hd-plano-nota { font-size: 10.5px; line-height: 1.35; }
+
+/* O escolhido precisa ser óbvio de longe: é o valor que vai ser cobrado. */
+.hd-plano.is-escolhido {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(99, 102, 241, .22), rgba(99, 102, 241, .07));
+  color: var(--txt);
+}
+.hd-plano.is-escolhido .hd-plano-valor { color: #fff; }
+
+/* Cabe uma fita só, no do meio. Duas já não destacariam nada. */
+.hd-plano-destaque { padding-top: 20px; }
+.hd-fita {
+  position: absolute; top: -1.5px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--accent), #4f46e5);
+  color: #fff;
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  padding: 2.5px 9px;
+  border-radius: 0 0 7px 7px;
+  white-space: nowrap;
+}
+
+.hd-renova {
+  margin: 10px 0 0;
+  font-size: 11.5px; line-height: 1.5;
+  color: var(--muted);
+  background: rgba(34, 211, 238, .07);
+  border: 1px solid rgba(34, 211, 238, .2);
+  border-radius: 10px;
+  padding: 8px 11px;
+}
+
+/* Em tela estreita três colunas espremem o preço; viram lista. */
+@media (max-width: 380px) {
+  .hd-planos { grid-template-columns: 1fr; }
+  .hd-plano { grid-template-columns: 1fr auto; text-align: left; align-items: center; padding: 11px 14px; }
+  .hd-plano-nota { grid-column: 1 / -1; }
+  .hd-plano-destaque { padding-top: 11px; }
+  .hd-fita { top: -1.5px; left: auto; right: 12px; transform: none; }
+}
+
+/* ---- plano e validade na tabela do painel ---- */
+.admin-plano {
+  display: inline-block;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.admin-plano.e-vitalicio { border-color: rgba(245, 158, 11, .45); color: #fbbf24; }
+.admin-plano.e-vencido { border-color: rgba(244, 63, 94, .4); color: #fb7185; }

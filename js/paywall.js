@@ -3,10 +3,10 @@
  * Compartilhada pelas duas páginas — o markup vem de partials/editor.html.
  */
 import {
-  REDUCAO_GRATIS, PRECO, TEXTO_PLANO, ENDPOINT_PAGAR, ENDPOINT_VALIDACAO,
-  MP_PUBLIC_KEY, VALOR_VIP,
+  REDUCAO_GRATIS, ENDPOINT_PAGAR, ENDPOINT_VALIDACAO, MP_PUBLIC_KEY,
   aplicarLimite,
 } from './licenca.js';
+import { PLANOS, ORDEM, PLANO_PADRAO, plano, precoEscrito } from './planos.js';
 import * as Conta from './conta.js';
 
 export { aplicarLimite };
@@ -23,6 +23,71 @@ const modal = $('modalHD');
 const aviso = $('hdAviso');
 let canvasPendente = null;
 let nomePendente = null;
+
+/* ------------------------------------------------------------------ *
+ * Escolha do plano
+ * ------------------------------------------------------------------ */
+let planoEscolhido = PLANO_PADRAO;
+
+/** Desenha os cartões a partir da tabela — nunca a partir de HTML escrito à mão. */
+function desenharPlanos() {
+  const caixa = $('hdPlanos');
+  caixa.textContent = '';
+
+  for (const id of ORDEM) {
+    const p = PLANOS[id];
+
+    const cartao = document.createElement('button');
+    cartao.type = 'button';
+    cartao.className = 'hd-plano' + (p.destaque ? ' hd-plano-destaque' : '');
+    cartao.dataset.plano = id;
+    cartao.setAttribute('role', 'radio');
+
+    if (p.destaque) {
+      const fita = document.createElement('span');
+      fita.className = 'hd-fita';
+      fita.textContent = 'melhor valor';
+      cartao.append(fita);
+    }
+
+    const nome = document.createElement('span');
+    nome.className = 'hd-plano-nome';
+    nome.textContent = p.nome;
+
+    const valor = document.createElement('strong');
+    valor.className = 'hd-plano-valor';
+    valor.textContent = precoEscrito(id);
+
+    const nota = document.createElement('small');
+    nota.className = 'hd-plano-nota';
+    nota.textContent = p.descricao;
+
+    cartao.append(nome, valor, nota);
+    cartao.addEventListener('click', () => escolher(id));
+    caixa.append(cartao);
+  }
+
+  marcarEscolhido();
+}
+
+function escolher(id) {
+  if (!plano(id) || id === planoEscolhido) return;
+  planoEscolhido = id;
+  marcarEscolhido();
+
+  // O Brick nasce com o valor dentro dele. Trocar de plano com o formulário
+  // aberto exige montar de novo, senão a pessoa pagaria o preço antigo.
+  if (brick) abrirFormularioDePagamento();
+}
+
+function marcarEscolhido() {
+  for (const cartao of $('hdPlanos').children) {
+    const marcado = cartao.dataset.plano === planoEscolhido;
+    cartao.classList.toggle('is-escolhido', marcado);
+    cartao.setAttribute('aria-checked', marcado ? 'true' : 'false');
+  }
+  $('hdPagar').textContent = 'Assinar por ' + precoEscrito(planoEscolhido);
+}
 
 /* ------------------------------------------------------------------ *
  * Download
@@ -73,8 +138,8 @@ export function abrirPaywall(canvas, nome) {
     $('hdTamHD').textContent = canvas.width + ' × ' + canvas.height;
   }
   $('hdLimite').textContent = Math.round(REDUCAO_GRATIS * 100) + '%';
-  $('hdPreco').textContent = PRECO;
-  $('hdPlano').textContent = TEXTO_PLANO;
+  desenharPlanos();
+  mostrarRenovacao();
   aviso.textContent = '';
   aviso.className = 'hd-aviso';
 
@@ -87,6 +152,27 @@ export function abrirPaywall(canvas, nome) {
   $('hdCodigo').closest('.hd-codigo').hidden = !logado;
 
   modal.hidden = false;
+}
+
+/**
+ * Quem já tem VIP com prazo está renovando, não comprando de novo. Vale dizer
+ * até quando vale hoje e que o tempo novo entra em cima, não no lugar.
+ */
+function mostrarRenovacao() {
+  const ate = Conta.ehVip ? Conta.vipAte() : undefined;
+  const linha = $('hdRenova');
+
+  if (ate === undefined) { linha.hidden = true; return; }
+
+  if (ate === null) {
+    linha.textContent = 'Você já tem o vitalício — não precisa comprar de novo.';
+    linha.hidden = false;
+    return;
+  }
+
+  const dia = new Date(ate).toLocaleDateString('pt-BR');
+  linha.textContent = 'Seu VIP vale até ' + dia + '. O tempo comprado agora entra em cima do que falta.';
+  linha.hidden = false;
 }
 
 function fechar() {
@@ -216,7 +302,7 @@ async function abrirFormularioDePagamento() {
     const mp = new window.MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
     brick = await mp.bricks().create('payment', 'hdBrick', {
       initialization: {
-        amount: VALOR_VIP,
+        amount: plano(planoEscolhido).valor,
         payer: { email: Conta.usuario().email },
       },
       customization: {
@@ -256,7 +342,10 @@ async function enviarPagamento(formData) {
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + Conta.tokenAcesso(),
     },
-    body: JSON.stringify({ formData }),
+    // O plano vai como id, nunca como preço: quem converte id em valor é o
+    // servidor. Mandar o valor daqui seria deixar o navegador escolher quanto
+    // pagar.
+    body: JSON.stringify({ formData, plano: planoEscolhido }),
   });
   const dados = await r.json().catch(() => ({}));
 

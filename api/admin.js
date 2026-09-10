@@ -115,7 +115,7 @@ async function listar(corpo, env) {
   const termo = String(corpo.busca || '').replace(/[^a-zA-Z0-9@._+\- ]/g, '').trim();
 
   let endereco = env.url + '/rest/v1/perfis'
-    + '?select=id,email,vip,admin,criado_em,ultimo_acesso'
+    + '?select=id,email,vip,vip_ate,plano,admin,criado_em,ultimo_acesso'
     + '&order=criado_em.desc&limit=' + limite;
 
   if (termo) endereco += '&email=ilike.' + encodeURIComponent('*' + termo + '*');
@@ -133,7 +133,16 @@ async function definir(corpo, quemPede, env) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw recusa('Conta inválida.');
 
   const mudancas = { atualizado_em: new Date().toISOString() };
-  if (typeof corpo.vip === 'boolean') mudancas.vip = corpo.vip;
+
+  if (typeof corpo.vip === 'boolean') {
+    mudancas.vip = corpo.vip;
+    // VIP dado pelo painel e cortesia, e cortesia nao vence — cobrar de novo
+    // de quem voce presenteou seria estranho. Marcado como 'cortesia' para nao
+    // se confundir com plano pago no relatorio.
+    mudancas.vip_ate = null;
+    mudancas.plano = corpo.vip ? 'cortesia' : null;
+  }
+
   if (typeof corpo.admin === 'boolean') mudancas.admin = corpo.admin;
 
   if (Object.keys(mudancas).length === 1) throw recusa('Nada para mudar.');

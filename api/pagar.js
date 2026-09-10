@@ -7,8 +7,10 @@
  *
  * DUAS COISAS QUE NÃO CONFIAMOS NO QUE VEM DO NAVEGADOR:
  *
- *   1. O valor. O Brick manda `transaction_amount`, mas quem manda é o preço
- *      definido aqui no servidor — senão daria para pagar R$ 0,01 e virar VIP.
+ *   1. O valor. O navegador escolhe um PLANO, por id; o preço sai da tabela
+ *      aqui do servidor. Se o valor viesse de fora, daria para pagar R$ 0,01 e
+ *      virar VIP — e o Brick manda `transaction_amount` no formulário, então a
+ *      tentação está literalmente no corpo da requisição.
  *   2. Quem está comprando. O `external_reference` sai do token da sessão, não
  *      de um campo do formulário.
  *
@@ -16,10 +18,14 @@
  *   MP_ACCESS_TOKEN            Access Token do Mercado Pago
  *   SUPABASE_URL               URL do projeto Supabase
  *   SUPABASE_SERVICE_ROLE_KEY  service_role key — NUNCA vá para o navegador
- *   PRECO_VIP                  valor em reais (ex.: 19.90)
  *   SITE_URL                   opcional. Se estiver ausente ou torto, o
  *                              endereço sai dos cabeçalhos da requisição.
  */
+
+// A mesma tabela que o navegador usa para desenhar os cartões. Importar em vez
+// de repetir evita o pior dos bugs de preço: a tela dizer um valor e a cobrança
+// ser outra.
+import { plano as buscarPlano, PLANO_PADRAO } from '../js/planos.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -31,8 +37,6 @@ export default async function handler(req, res) {
   const mpToken = process.env.MP_ACCESS_TOKEN;
   const supabaseUrl = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const preco = Number(process.env.PRECO_VIP || '19.90');
-
   if (!mpToken || !supabaseUrl || !serviceKey) {
     return res.status(500).json({ ok: false, motivo: 'Servidor sem as variáveis de ambiente configuradas.' });
   }
@@ -55,14 +59,24 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false, motivo: 'Sessão expirada. Entre de novo.' });
   }
 
+  /* ---- qual plano ---- */
+  // Passa pela tabela: um id inventado não vira preço, vira erro.
+  const escolhido = buscarPlano((req.body && req.body.plano) || PLANO_PADRAO);
+  if (!escolhido) {
+    return res.status(400).json({ ok: false, motivo: 'Plano desconhecido.' });
+  }
+
   /* ---- monta o pagamento ---- */
   const form = (req.body && req.body.formData) || {};
 
   const pagamento = {
     // valor e destinatário são nossos, não do navegador
-    transaction_amount: preco,
+    transaction_amount: escolhido.valor,
     external_reference: usuario.id,
-    description: 'EditorBG VIP — acesso vitalício',
+    description: 'EditorBG VIP — ' + escolhido.nome,
+
+    // O webhook precisa saber o que foi comprado para calcular até quando vale.
+    metadata: { plano: escolhido.id },
 
     // o que o Brick coletou
     payment_method_id: form.payment_method_id,
@@ -120,6 +134,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     id: criado.id,
+    plano: escolhido.id,
     status: criado.status,                 // approved | pending | in_process | rejected
     detalhe: criado.status_detail,
     pix: pix

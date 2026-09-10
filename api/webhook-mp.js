@@ -17,6 +17,9 @@
  *   SUPABASE_SERVICE_ROLE_KEY  service_role key
  */
 
+import { liberarPlano } from './_supabase.js';
+import { planoDoPagamento } from '../js/planos.js';
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -72,18 +75,15 @@ export default async function handler(req, res) {
     'Content-Type': 'application/json',
   };
 
+  const planoId = planoDoPagamento(pagamento);
+
   try {
-    const r = await fetch(supabaseUrl + '/rest/v1/perfis?id=eq.' + encodeURIComponent(usuarioId), {
-      method: 'PATCH',
-      headers: { ...cabecalhos, Prefer: 'return=representation' },
-      body: JSON.stringify({
-        vip: true,
-        pagamento_id: pagamentoId,
-        atualizado_em: new Date().toISOString(),
-      }),
+    const { ate } = await liberarPlano(usuarioId, planoId, pagamentoId, {
+      url: supabaseUrl.replace(/\/$/, ''),
+      chave: serviceKey,
     });
-    if (!r.ok) throw new Error('PATCH ' + r.status + ' ' + (await r.text()));
-    console.log('VIP liberado para', usuarioId, 'pelo pagamento', pagamentoId);
+    console.log('VIP', planoId, 'liberado para', usuarioId,
+      'pelo pagamento', pagamentoId, '— vale ate', ate || 'sempre');
   } catch (err) {
     console.error('Falha ao gravar o plano:', err);
     return res.status(500).json({ erro: 'gravação falhou' });   // deixa reenviar
@@ -103,6 +103,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         id: pagamentoId,
         usuario_id: usuarioId,
+        plano: planoId,
         email: (pagamento.payer && pagamento.payer.email) || null,
         valor: pagamento.transaction_amount || 0,
         moeda: pagamento.currency_id || 'BRL',

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+
+  "//": [
+    "cleanUrls tira o .html do endereço: editorbg.com.br/remover-fundo em vez",
+    "de editorbg.com.br/remover-fundo.html, e / em vez de /index.html. Os",
+    "endereços antigos continuam funcionando — a Vercel redireciona com 308,",
+    "então links já compartilhados não quebram.",
+    "",
+    "Isso vale também para partials/editor.html e partials/conta.html, que são",
+    "buscados por fetch e não são páginas. Não é problema: fetch segue redirect",
+    "sozinho. Os módulos passaram a pedir o caminho sem extensão de qualquer",
+    "forma, para pular o salto.",
+    "",
+    "trailingSlash false para /remover-fundo e /remover-fundo/ não virarem dois",
+    "endereços com o mesmo conteúdo, o que confunde buscador."
+  ],
+
+  "cleanUrls": true,
+  "trailingSlash": false,
+
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ]
+    },
+    {
+      "//": "O painel não é para aparecer em buscador nenhum.",
+      "source": "/admin",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
+  ]
+}

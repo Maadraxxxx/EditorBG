@@ -15,8 +15,9 @@
  * ------------------------------------------------------------------ */
 /** Quanto o arquivo grátis perde de resolução. 0.30 = sai com 70% do tamanho original. */
 export const REDUCAO_GRATIS = 0.30;
-export const PRECO = 'R$ 19,90';
-export const TEXTO_PLANO = 'pagamento único, acesso vitalício';
+
+// Preços e durações moram em js/planos.js, que o servidor também importa —
+// assim o valor mostrado na tela e o cobrado no cartão não têm como divergir.
 
 /**
  * Chave pública do Mercado Pago, usada pelo Payment Brick no navegador.
@@ -24,9 +25,6 @@ export const TEXTO_PLANO = 'pagamento único, acesso vitalício';
  * esse sim secreto, vive só nas variáveis de ambiente do servidor.
  */
 export const MP_PUBLIC_KEY = 'APP_USR-5d8feedf-bdee-4c6c-a151-1d157ae775a4';
-
-/** Valor cobrado. O servidor tem o seu próprio (PRECO_VIP) e é ele que vale. */
-export const VALOR_VIP = 19.90;
 
 /**
  * Funções serverless. O pagamento nasce amarrado à conta de quem compra — é
