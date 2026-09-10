@@ -1,0 +1,68 @@
+<!-- Entrar, criar conta, trocar a senha e ver o plano.
+     Injetado por js/conta-ui.js em qualquer pagina que importe o modulo. -->
+<div class="modal" id="modalConta" hidden>
+  <div class="hd-card conta-card">
+    <button class="modal-close hd-fechar" id="contaFechar" aria-label="Fechar">✕</button>
+
+    <div id="contaFormulario">
+      <h2 id="contaTitulo">Entrar</h2>
+      <p class="hd-sub" id="contaSub">Sua conta guarda o plano VIP.</p>
+
+      <label class="ed-field">E-mail
+        <input type="email" id="contaEmail" autocomplete="email" placeholder="voce@email.com" />
+      </label>
+      <!-- As duas confirmações só aparecem no cadastro: um e-mail digitado
+           errado deixa a pessoa sem como recuperar a conta depois. -->
+      <label class="ed-field" id="campoEmail2" hidden>Confirme o e-mail
+        <input type="email" id="contaEmail2" autocomplete="off" placeholder="digite o mesmo e-mail" />
+      </label>
+
+      <label class="ed-field">Senha
+        <input type="password" id="contaSenha" autocomplete="current-password" placeholder="mínimo 6 caracteres" />
+      </label>
+      <label class="ed-field" id="campoSenha2" hidden>Confirme a senha
+        <input type="password" id="contaSenha2" autocomplete="new-password" placeholder="digite a mesma senha" />
+      </label>
+
+      <button class="btn primary full" id="contaEnviar">Entrar</button>
+      <button class="btn ghost full" id="contaGoogle">Entrar com Google</button>
+
+      <p class="hd-aviso" id="contaAviso"></p>
+      <p class="conta-troca">
+        <span id="contaTexto">Não tem conta?</span>
+        <button type="button" class="link-botao" id="contaAlternar">Criar conta</button>
+      </p>
+      <p class="conta-troca">
+        <button type="button" class="link-botao" id="contaEsqueci">Esqueci a senha</button>
+      </p>
+    </div>
+
+    <!-- Aparece quando a pessoa chega pelo link de "esqueci a senha". -->
+    <div id="contaRecuperar" hidden>
+      <h2>Criar uma senha nova</h2>
+      <p class="hd-sub">Você entrou pelo link do e-mail. Escolha a senha que vai usar daqui em diante.</p>
+
+      <label class="ed-field">Nova senha
+        <input type="password" id="contaSenhaNova" autocomplete="new-password" placeholder="mínimo 6 caracteres" />
+      </label>
+      <label class="ed-field">Repita a nova senha
+        <input type="password" id="contaSenhaNova2" autocomplete="new-password" placeholder="digite a mesma senha" />
+      </label>
+
+      <button class="btn primary full" id="contaSalvarSenha">Salvar senha</button>
+
+      <p class="hd-aviso" id="contaAvisoSenha"></p>
+      <p class="conta-troca">
+        <button type="button" class="link-botao" id="contaPularSenha">Agora não, continuar assim</button>
+      </p>
+    </div>
+
+    <div id="contaLogada" hidden>
+      <div class="conta-avatar" id="contaInicial">?</div>
+      <h2 id="contaEmailLogado">—</h2>
+      <p class="conta-plano" id="contaPlano">Plano grátis</p>
+      <button class="btn primary full" id="contaVerVip">Conhecer o VIP</button>
+      <button class="btn ghost full" id="contaSair">Sair da conta</button>
+    </div>
+  </div>
+</div>

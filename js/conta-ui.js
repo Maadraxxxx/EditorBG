@@ -4,6 +4,13 @@
  */
 import * as Conta from './conta.js';
 
+// A tela vem junto com o modulo: assim a home, que nao carrega o editor,
+// ganha o botao de conta so por importar este arquivo.
+if (!document.getElementById('modalConta')) {
+  const url = new URL('../partials/conta.html', import.meta.url);
+  document.body.insertAdjacentHTML('beforeend', await fetch(url).then((r) => r.text()));
+}
+
 const $ = (id) => document.getElementById(id);
 
 const modal = $('modalConta');
@@ -109,19 +116,54 @@ modal.addEventListener('click', (e) => { if (e.target === modal) fechar(); });
 
 $('contaAlternar').addEventListener('click', () => {
   modo = modo === 'entrar' ? 'cadastrar' : 'entrar';
+  pintarFormulario();
+  aviso.textContent = '';
+});
+
+/** Deixa o formulario com a cara do modo atual: entrar ou criar conta. */
+function pintarFormulario() {
   const entrando = modo === 'entrar';
   $('contaTitulo').textContent = entrando ? 'Entrar' : 'Criar conta';
   $('contaEnviar').textContent = entrando ? 'Entrar' : 'Criar conta';
   $('contaTexto').textContent = entrando ? 'Não tem conta?' : 'Já tem conta?';
   $('contaAlternar').textContent = entrando ? 'Criar conta' : 'Entrar';
   $('contaSenha').autocomplete = entrando ? 'current-password' : 'new-password';
-  aviso.textContent = '';
-});
 
-$('contaEnviar').addEventListener('click', async () => {
+  // Conferir e-mail e senha so faz sentido para quem esta criando a conta.
+  $('campoEmail2').hidden = entrando;
+  $('campoSenha2').hidden = entrando;
+  $('contaEmail2').value = '';
+  $('contaSenha2').value = '';
+
+  // "Esqueci a senha" nao tem o que fazer numa conta que ainda nao existe.
+  $('contaEsqueci').closest('.conta-troca').hidden = !entrando;
+}
+
+$('contaEnviar').addEventListener('click', enviar);
+
+// Enter em qualquer campo do formulario envia, como em qualquer site.
+for (const id of ['contaEmail', 'contaEmail2', 'contaSenha', 'contaSenha2']) {
+  $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') enviar(); });
+}
+
+async function enviar() {
   const email = $('contaEmail').value.trim();
   const senha = $('contaSenha').value;
   if (!email || !senha) return mostrar('Preencha e-mail e senha.', 'erro');
+
+  if (modo === 'cadastrar') {
+    // Comparacao sem diferenciar maiusculas: e-mail nao distingue, e reclamar
+    // de "Joao@" contra "joao@" seria implicancia com a pessoa certa.
+    if ($('contaEmail2').value.trim().toLowerCase() !== email.toLowerCase()) {
+      return mostrar('Os dois e-mails não são iguais.', 'erro');
+    }
+    if ($('contaSenha2').value !== senha) {
+      return mostrar('As duas senhas não são iguais.', 'erro');
+    }
+    if (senha.length < 6) {
+      return mostrar('A senha precisa de pelo menos 6 caracteres.', 'erro');
+    }
+  }
 
   mostrar(modo === 'entrar' ? 'Entrando…' : 'Criando conta…');
   try {
@@ -136,7 +178,7 @@ $('contaEnviar').addEventListener('click', async () => {
   } catch (err) {
     mostrar(err.message, 'erro');
   }
-});
+}
 
 $('contaGoogle').addEventListener('click', async () => {
   try { await Conta.entrarComGoogle(); } catch (err) { mostrar(err.message, 'erro'); }
