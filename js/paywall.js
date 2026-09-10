@@ -98,23 +98,94 @@ function marcarEscolhido() {
 }
 
 /* ------------------------------------------------------------------ *
- * Download
- * ------------------------------------------------------------------ */
-function nomeDeSaida(nome, hd) {
-  const base = nome.replace(/\.[^./\\]+$/, '');
-  return base + (hd ? '-HD' : '') + '.png';
+ * Formato do arquivo
+ * ------------------------------------------------------------------ *
+ * Escolha de todo mundo, não só de quem paga: o plano decide a RESOLUÇÃO, não
+ * o tipo de arquivo. Cobrar por JPG seria cobrar por algo que não custa nada.
+ */
+export const FORMATOS = {
+  png:  { ext: 'png', mime: 'image/png',  rotulo: 'PNG', transparencia: true },
+  jpeg: { ext: 'jpg', mime: 'image/jpeg', rotulo: 'JPG', transparencia: false, qualidade: 0.92 },
+};
+
+const CHAVE_FORMATO = 'editorbg:formato';
+let formato = 'png';
+
+try {
+  const salvo = localStorage.getItem(CHAVE_FORMATO);
+  if (salvo && FORMATOS[salvo]) formato = salvo;
+} catch { /* navegador sem storage: fica no padrão */ }
+
+export function formatoAtual() {
+  return FORMATOS[formato];
 }
 
-function salvar(canvas, nome, hd) {
+export function definirFormato(id) {
+  if (!FORMATOS[id] || id === formato) return;
+  formato = id;
+  try { localStorage.setItem(CHAVE_FORMATO, id); } catch { /* tudo bem */ }
+  pintarSeletores();
+}
+
+/**
+ * JPEG não guarda transparência, e canvas transparente vira PRETO no JPEG, não
+ * branco — o alfa some e sobra o RGB, que é zero onde nada foi desenhado. Uma
+ * foto recortada baixada em JPG sairia com fundo preto sem este passo.
+ */
+function achatar(canvas) {
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(canvas, 0, 0);
+  return out;
+}
+
+/** Canvas para arquivo, no formato escolhido. Usada também pelo .zip. */
+export function paraBlob(canvas) {
+  const f = formatoAtual();
+  const fonte = f.transparencia ? canvas : achatar(canvas);
+  return new Promise((resolve) => fonte.toBlob(resolve, f.mime, f.qualidade));
+}
+
+/* ---- os seletores espalhados pelas páginas ---- */
+function pintarSeletores() {
+  for (const b of document.querySelectorAll('.fmt button[data-formato]')) {
+    b.classList.toggle('is-active', b.dataset.formato === formato);
+  }
+  for (const nota of document.querySelectorAll('.fmt-nota')) {
+    nota.hidden = formatoAtual().transparencia;
+  }
+}
+
+// Delegado no documento: cada página põe o seletor num lugar, e um deles só
+// existe depois que o partial do editor é injetado.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.fmt button[data-formato]');
+  if (b) definirFormato(b.dataset.formato);
+});
+
+pintarSeletores();
+
+/* ------------------------------------------------------------------ *
+ * Download
+ * ------------------------------------------------------------------ */
+export function nomeDeSaida(nome, hd) {
+  const base = nome.replace(/\.[^./\\]+$/, '');
+  return base + (hd ? '-HD' : '') + '.' + formatoAtual().ext;
+}
+
+async function salvar(canvas, nome, hd) {
   const saida = aplicarLimite(canvas, hd);
-  saida.toBlob((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomeDeSaida(nome, hd);
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, 'image/png');
+  const blob = await paraBlob(saida);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeDeSaida(nome, hd);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**

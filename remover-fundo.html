@@ -89,6 +89,17 @@
       <input type="range" id="feather" min="0" max="6" step="1" value="0" />
     </div>
 
+    <div class="tool-group">
+      <span class="tool-label">Formato do arquivo</span>
+      <div class="fmt" role="group" aria-label="Formato do arquivo">
+        <button type="button" data-formato="png" class="is-active">PNG</button>
+        <button type="button" data-formato="jpeg">JPG</button>
+      </div>
+      <!-- Aviso visivel aqui de proposito: esta e a pagina de tirar fundo, e
+           JPG joga fora justamente o que a pessoa veio buscar. -->
+      <p class="fmt-nota" hidden>JPG não guarda transparência: o fundo sai branco.</p>
+    </div>
+
     <div class="tool-actions">
       <button class="btn ghost" id="clearBtn">Limpar tudo</button>
       <button class="btn hd" id="downloadHDBtn" title="Resolução original">

@@ -1607,3 +1607,43 @@ th.admin-c { text-align: center; }
 }
 .admin-plano.e-vitalicio { border-color: rgba(245, 158, 11, .45); color: #fbbf24; }
 .admin-plano.e-vencido { border-color: rgba(244, 63, 94, .4); color: #fb7185; }
+
+/* ------------------------------------------------------------------ *
+ * Escolha do formato do arquivo
+ * ------------------------------------------------------------------ */
+.fmt {
+  display: inline-flex;
+  background: #0b1020;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.fmt button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 700;
+  letter-spacing: .4px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.fmt button:hover { color: var(--txt); }
+.fmt button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+
+.fmt button.is-active {
+  background: linear-gradient(180deg, var(--accent), #4f46e5);
+  color: #fff;
+}
+
+.fmt-compacto { padding: 2px; }
+.fmt-compacto button { font-size: 11px; padding: 4px 11px; }
+
+.fmt-nota {
+  margin: 8px 0 0;
+  font-size: 11.5px; line-height: 1.5;
+  color: #fbbf24;
+}
