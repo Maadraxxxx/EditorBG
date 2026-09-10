@@ -26,6 +26,9 @@ function armarFetch(cenario) {
     if (u.includes('select=admin')) {
       return resposta(200, [{ admin: cenario.admin }]);
     }
+    if (u.includes('select=plano')) {
+      return resposta(200, [cenario.perfil || {}]);
+    }
     if (u.includes('/rpc/resumo_admin')) {
       return resposta(200, { contas: 7, faturado: 59.7 });
     }
@@ -96,6 +99,52 @@ await caso('tirar o proprio admin', admin, { ...comToken, body: { acao: 'definir
 await caso('dar vip para outro', admin, { ...comToken, body: { acao: 'definir', id: OUTRO, vip: true } }, '200');
 await caso('vip como texto e ignorado', admin, { ...comToken, body: { acao: 'definir', id: OUTRO, vip: 'sim' } },
   '400 | Nada para mudar.');
+
+/* ------------------------------------------------------------------ *
+ * O interruptor de VIP nao pode reescrever um plano pago
+ * ------------------------------------------------------------------ *
+ * Aconteceu de verdade: desligar e religar o VIP de quem tinha comprado o
+ * vitalicio transformava o plano dele em "cortesia". O painel manda no ACESSO,
+ * nao no que a pessoa comprou.
+ */
+console.log('\n--- o interruptor de VIP e o plano pago ---');
+
+async function mudarVip(perfil, ligar) {
+  armarFetch({ ...admin, perfil });
+  const resposta2 = fingirRes();
+  await handler({
+    method: 'POST',
+    headers: { authorization: 'Bearer t' },
+    body: { acao: 'definir', id: OUTRO, vip: ligar },
+  }, resposta2);
+  const patch = pedidos.find((p) => p.metodo === 'PATCH');
+  return patch ? JSON.parse(patch.corpo) : {};
+}
+
+function conferir(nome, condicao, enviado) {
+  if (!condicao) falhas++;
+  console.log((condicao ? '  ok  ' : ' FALHA') + '  ' + nome);
+  if (!condicao) console.log('        mandou: ' + JSON.stringify(enviado));
+}
+
+const pago = { plano: 'vitalicio', vip_ate: null };
+const mensal = { plano: 'mensal', vip_ate: new Date(Date.now() + 20 * 86400e3).toISOString() };
+const vencido = { plano: 'mensal', vip_ate: new Date(Date.now() - 86400e3).toISOString() };
+
+let g = await mudarVip(pago, false);
+conferir('desligar nao toca no plano pago', !('plano' in g) && !('vip_ate' in g), g);
+
+g = await mudarVip(pago, true);
+conferir('religar quem tem vitalicio nao vira cortesia', !('plano' in g), g);
+
+g = await mudarVip(mensal, true);
+conferir('religar quem tem mensal valendo mantem o mensal', !('plano' in g), g);
+
+g = await mudarVip(vencido, true);
+conferir('plano vencido vira cortesia ao religar', g.plano === 'cortesia', g);
+
+g = await mudarVip({}, true);
+conferir('conta sem plano ganha cortesia sem prazo', g.plano === 'cortesia' && g.vip_ate === null, g);
 
 console.log('\n--- a busca vai limpa para o PostgREST ---');
 armarFetch(admin);

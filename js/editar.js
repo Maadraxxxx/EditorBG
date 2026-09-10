@@ -12,6 +12,8 @@ import './conta-ui.js';
 // chama o outro direto. Eram ouvidos só aqui e em editar.js, o que fazia os
 // mesmos botões não funcionarem na home.
 import { refreshSliders } from './sliders.js';
+import * as Conta from './conta.js';
+import * as Rascunho from './rascunho.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -100,15 +102,104 @@ async function carregar(file) {
     edit: defaultEdit(),
   };
 
+  abrirItem(item);
+}
+
+function abrirItem(item) {
   root.classList.remove('is-empty');
+  $('edRetomar').hidden = true;
   openEditor(item, {
     background: 'transparent',
     feather: 0,
     pageMode: true,
     onDownload: baixar,
-    onClose: mostrarVazio,
+    onClose: aoFechar,
+    onMudou: guardarRascunho,
   });
 }
+
+function aoFechar() {
+  mostrarVazio();
+  oferecerRetomada();   // fechou sem querer? o trabalho continua guardado
+}
+
+/* ------------------------------------------------------------------ *
+ * Continuar de onde parou
+ * ------------------------------------------------------------------ *
+ * Guardado no navegador de quem edita, nunca no servidor: o site promete em
+ * três telas que as imagens não são enviadas para lugar nenhum, e essa
+ * promessa vale mais do que a conveniência de o rascunho seguir a pessoa
+ * entre aparelhos.
+ */
+function guardarRascunho(item) {
+  const u = Conta.usuario();
+  if (!u) return;                     // sem conta não há a quem amarrar o rascunho
+  Rascunho.guardar(u.id, item);
+}
+
+let miniaturaUrl = null;
+
+async function oferecerRetomada() {
+  const convite = $('edRetomar');
+  const u = Conta.usuario();
+
+  if (!u) { convite.hidden = true; return; }
+
+  const r = await Rascunho.resumo(u.id);
+  if (!r) { convite.hidden = true; return; }
+
+  $('edRetomarInfo').textContent =
+    r.nome + ' · ' + r.largura + '×' + r.altura + ' · ' + faz(r.quando);
+
+  // A miniatura precisa da imagem, então só é lida depois de haver rascunho.
+  const cheio = await Rascunho.ler(u.id);
+  if (cheio) {
+    if (miniaturaUrl) URL.revokeObjectURL(miniaturaUrl);
+    const c = document.createElement('canvas');
+    const k = 64 / Math.max(cheio.bitmap.width, cheio.bitmap.height);
+    c.width = Math.max(1, Math.round(cheio.bitmap.width * k));
+    c.height = Math.max(1, Math.round(cheio.bitmap.height * k));
+    c.getContext('2d').drawImage(cheio.bitmap, 0, 0, c.width, c.height);
+    miniaturaUrl = c.toDataURL('image/png');
+    $('edRetomarMiniatura').src = miniaturaUrl;
+  }
+
+  convite.hidden = false;
+}
+
+function faz(quando) {
+  const min = Math.floor((Date.now() - quando) / 60000);
+  if (min < 1) return 'agora há pouco';
+  if (min < 60) return 'há ' + min + ' min';
+  const h = Math.floor(min / 60);
+  if (h < 24) return 'há ' + h + (h === 1 ? ' hora' : ' horas');
+  const d = Math.floor(h / 24);
+  return 'há ' + d + (d === 1 ? ' dia' : ' dias');
+}
+
+$('edRetomarAbrir').addEventListener('click', async () => {
+  const u = Conta.usuario();
+  if (!u) return;
+  const r = await Rascunho.ler(u.id);
+  if (!r) { $('edRetomar').hidden = true; return; }
+
+  abrirItem({
+    name: r.name,
+    bitmap: r.bitmap,
+    aiMask: r.maskCanvas,
+    maskCanvas: cloneCanvas(r.maskCanvas),
+    edit: { ...defaultEdit(), ...r.edit },
+  });
+});
+
+$('edRetomarDescartar').addEventListener('click', async () => {
+  const u = Conta.usuario();
+  if (u) await Rascunho.apagar(u.id);
+  $('edRetomar').hidden = true;
+});
+
+// Entrar na conta revela o rascunho daquela conta; sair esconde o dos outros.
+Conta.aoMudar(() => { if (!empty.hidden) oferecerRetomada(); });
 
 /* ------------------------------------------------------------------ *
  * Download

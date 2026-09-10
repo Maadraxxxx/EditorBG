@@ -345,6 +345,22 @@
           <button class="btn primary" id="edPick" type="button">Escolher imagem</button>
           <small>PNG, JPG, WEBP · nada é enviado para servidores</small>
         </div>
+
+        <!-- Só aparece para quem tem conta e deixou trabalho pela metade.
+             O rascunho fica no navegador, então o convite só surge no mesmo
+             aparelho onde a edição aconteceu. -->
+        <div class="ed-retomar" id="edRetomar" hidden>
+          <img id="edRetomarMiniatura" alt="" />
+          <div class="ed-retomar-texto">
+            <strong>Continuar de onde parou</strong>
+            <span id="edRetomarInfo">—</span>
+          </div>
+          <div class="ed-retomar-acoes">
+            <button class="btn primary" id="edRetomarAbrir" type="button">Continuar</button>
+            <button class="link-botao" id="edRetomarDescartar" type="button">Descartar</button>
+          </div>
+        </div>
+
         <input type="file" id="edFile" accept="image/*" hidden />
       </div>
 

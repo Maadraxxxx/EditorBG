@@ -1647,3 +1647,45 @@ th.admin-c { text-align: center; }
   font-size: 11.5px; line-height: 1.5;
   color: #fbbf24;
 }
+
+/* ------------------------------------------------------------------ *
+ * Convite para continuar a última edição
+ * ------------------------------------------------------------------ */
+.ed-retomar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  max-width: 460px;
+  width: 100%;
+}
+
+.ed-retomar img {
+  width: 46px; height: 46px;
+  object-fit: cover;
+  border-radius: 9px;
+  background:
+    linear-gradient(45deg, #1a2237 25%, transparent 25%, transparent 75%, #1a2237 75%) 0 0 / 10px 10px,
+    linear-gradient(45deg, #1a2237 25%, #141a2b 25%, #141a2b 75%, #1a2237 75%) 5px 5px / 10px 10px;
+  flex: none;
+}
+
+.ed-retomar-texto { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.ed-retomar-texto strong { font-size: 13.5px; }
+.ed-retomar-texto span {
+  font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.ed-retomar-acoes { display: grid; gap: 5px; justify-items: center; flex: none; }
+.ed-retomar-acoes .btn { padding: 7px 16px; font-size: 12.5px; }
+.ed-retomar-acoes .link-botao { font-size: 11px; }
+
+@media (max-width: 520px) {
+  .ed-retomar { flex-wrap: wrap; justify-content: center; text-align: center; }
+  .ed-retomar-texto { flex-basis: 100%; justify-items: center; }
+}

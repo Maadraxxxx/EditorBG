@@ -448,3 +448,36 @@ mutuamente e um ciclo com `await` no topo travaria os dois.
 A regra que sobra: se um botão precisa de uma tela, o módulo dele traz a tela.
 Espalhar markup por páginas e ouvintes por arquivos é o que fazia o mesmo botão
 funcionar em duas páginas e falhar em silêncio numa terceira.
+
+## Continuar de onde parou
+
+Quem tem conta e sai no meio de uma edição encontra o trabalho ao voltar: um
+cartão "Continuar de onde parou" aparece na tela vazia do editor, com
+miniatura, nome e quando foi.
+
+**Fica no navegador, não no servidor.** Foi uma escolha, não uma limitação: o
+site promete em três telas que as imagens não são enviadas para lugar nenhum, e
+guardar o trabalho de alguém num bucket tornaria essas frases falsas. O preço é
+que o rascunho não acompanha a pessoa entre aparelhos — quem editou no
+computador não encontra no celular.
+
+IndexedDB e não `localStorage`, que só guarda texto e estoura em poucos
+megabytes; uma imagem de 3000px em PNG passa disso sozinha.
+
+O rascunho é guardado sob o **id da conta**, então duas pessoas no mesmo
+computador não veem o trabalho uma da outra, e ninguém vê nada deslogado.
+
+Um rascunho por conta: o pedido era a **última** imagem, então a nova
+sobrescreve a anterior.
+
+### O gatilho
+
+`openEditor` aceita `onMudou`, chamado pelo `draw()` — o único ponto por onde
+toda alteração passa: pincel, ajuste, recorte, camada, rotação. Com espera de
+1,5 s, porque `draw()` roda a cada movimento do pincel e gravar imagem a cada
+quadro travaria a mão de quem está pintando.
+
+### Camadas de imagem
+
+Carregam um `ImageBitmap`, que não atravessa o fechar da aba de forma
+confiável. Viram blob na gravação e voltam a bitmap na leitura.

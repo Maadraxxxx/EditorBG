@@ -96,6 +96,17 @@ export default async function handler(req, res) {
   }
 }
 
+/** O que a conta tem hoje, para não sobrescrever um plano pago sem querer. */
+async function lerPlano(id, env) {
+  const r = await fetch(
+    env.url + '/rest/v1/perfis?select=plano,vip_ate&id=eq.' + encodeURIComponent(id),
+    { headers: cabecalhos(env.chave) }
+  );
+  if (!r.ok) return {};
+  const linhas = await r.json();
+  return linhas[0] || {};
+}
+
 /** Erro de quem pediu, nao de quem respondeu. */
 function recusa(mensagem) {
   const err = new Error(mensagem);
@@ -136,11 +147,26 @@ async function definir(corpo, quemPede, env) {
 
   if (typeof corpo.vip === 'boolean') {
     mudancas.vip = corpo.vip;
-    // VIP dado pelo painel e cortesia, e cortesia nao vence — cobrar de novo
-    // de quem voce presenteou seria estranho. Marcado como 'cortesia' para nao
-    // se confundir com plano pago no relatorio.
-    mudancas.vip_ate = null;
-    mudancas.plano = corpo.vip ? 'cortesia' : null;
+
+    if (!corpo.vip) {
+      // Desligar mexe SÓ no acesso. A versão anterior zerava `plano` e
+      // `vip_ate` junto, e o efeito era apagar o registro de quem tinha pagado:
+      // desligar e religar o interruptor transformava um vitalício comprado em
+      // "cortesia". O que a pessoa comprou não é do painel para reescrever.
+    } else {
+      const atual = await lerPlano(id, env);
+      const temPlanoValendo = atual.plano
+        && atual.plano !== 'cortesia'
+        && (atual.vip_ate === null || new Date(atual.vip_ate) > new Date());
+
+      if (!temPlanoValendo) {
+        // Cortesia não vence: cobrar de novo de quem você presenteou seria
+        // estranho. Marcada como 'cortesia' para não virar faturamento.
+        mudancas.vip_ate = null;
+        mudancas.plano = 'cortesia';
+      }
+      // Com plano pago ainda válido, religar apenas devolve o acesso.
+    }
   }
 
   if (typeof corpo.admin === 'boolean') mudancas.admin = corpo.admin;

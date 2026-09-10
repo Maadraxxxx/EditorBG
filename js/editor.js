@@ -137,6 +137,7 @@ export function openEditor(item, opts) {
     pageMode: !!opts.pageMode,
     onDownload: opts.onDownload,
     onClose: opts.onClose,
+    onMudou: opts.onMudou,
     mask: cloneCanvas(item.maskCanvas),          // cópia: cancelar não altera nada
     edit: JSON.parse(JSON.stringify(item.edit)),
     tool: 'brush',
@@ -345,6 +346,26 @@ function draw() {
 
   if (modoCamadas() && S.sel) desenharSelecao(m);
   paintCropBox();
+  avisarMudanca();
+}
+
+/**
+ * Avisa quem abriu o editor que o trabalho mudou, para poder guardar.
+ *
+ * Pendurado no draw() porque é o único ponto por onde toda alteração passa —
+ * pincel, ajuste, recorte, camada, rotação. E com espera longa de propósito:
+ * o draw() roda a cada movimento do pincel, e gravar imagem a cada quadro
+ * travaria a mão de quem está pintando.
+ */
+let avisoPendente = null;
+
+function avisarMudanca() {
+  if (!S || !S.onMudou) return;
+  clearTimeout(avisoPendente);
+  avisoPendente = setTimeout(() => {
+    if (!S || !S.onMudou) return;
+    try { S.onMudou(fixarEdicoes()); } catch (err) { console.warn(err); }
+  }, 1500);
 }
 
 function paintCropBox() {
