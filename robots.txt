@@ -1,0 +1,17 @@
+# EditorBG — https://editorbg.com.br
+
+User-agent: *
+Allow: /
+
+# O painel não é para aparecer em buscador nenhum. Isto é um pedido, não uma
+# trava: quem protege o painel de verdade é a checagem de cargo em api/admin.js.
+Disallow: /admin
+
+# Os partials são pedaços de HTML buscados por fetch, não páginas. Indexados,
+# apareceriam na busca como texto solto sem cabeçalho nem estilo.
+Disallow: /partials/
+
+# As funções serverless não têm o que indexar.
+Disallow: /api/
+
+Sitemap: https://editorbg.com.br/sitemap.xml

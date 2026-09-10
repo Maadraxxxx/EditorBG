@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  As três páginas públicas. Endereços sem .html porque o vercel.json liga
+  cleanUrls: a versão com extensão redireciona, e apontar o buscador para um
+  redirect só gasta rastreamento à toa.
+
+  /admin fica de fora de propósito.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://editorbg.com.br/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://editorbg.com.br/remover-fundo</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://editorbg.com.br/editar</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>
