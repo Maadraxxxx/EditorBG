@@ -56,6 +56,10 @@
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/></svg>
           <span>Recortar</span>
         </button>
+        <button data-tool="resize">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5V4h6.5"/><path d="M20 13.5V20h-6.5"/><path d="m4 4 6.5 6.5"/><path d="M20 20l-6.5-6.5"/></svg>
+          <span>Redimensionar</span>
+        </button>
         <button data-tool="texto">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 6.5V4.5h14v2"/><path d="M12 4.5v15"/><path d="M8.5 19.5h7"/></svg>
           <span>Texto</span>
@@ -188,6 +192,15 @@
           <button class="btn ghost full" id="cropTrim">Cortar rente ao objeto</button>
           <button class="btn ghost full" id="cropReset">Usar imagem inteira</button>
 
+          <p class="ed-hint small" id="cropInfo"></p>
+        </div>
+
+        <!-- REDIMENSIONAR -->
+        <!-- Redimensionar muda o tamanho da imagem inteira; recortar tira um
+             pedaço dela. São coisas diferentes, e estavam na mesma aba. -->
+        <div class="ed-panel" data-panel="resize">
+          <p class="ed-hint">Mude o tamanho da imagem inteira, em pixels.</p>
+
           <div class="px-group">
             <span class="px-title">Tamanho da imagem</span>
             <div class="px-row">
@@ -203,8 +216,6 @@
             <button class="btn ghost full" id="outReset">Redefinir tamanho</button>
             <p class="ed-hint small">Dimensões do arquivo que vai ser salvo.</p>
           </div>
-
-          <p class="ed-hint small" id="cropInfo"></p>
         </div>
 
         <!-- TEXTO -->
