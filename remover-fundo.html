@@ -130,6 +130,149 @@
 
   <!-- RESULTADOS -->
   <section class="grid" id="grid"></section>
+
+  <!-- ================================================================
+       Texto abaixo da ferramenta. Quem chegou para recortar uma foto
+       arrasta e vai embora; quem chegou pela busca encontra a resposta.
+       ================================================================ -->
+  <section class="conteudo">
+
+    <h2>Como a IA decide o que é objeto e o que é fundo</h2>
+    <p>
+      O modelo foi treinado com centenas de milhares de imagens em que alguém
+      marcou, à mão, o que era o assunto principal. Ele aprendeu o padrão: o que
+      está em foco, o que está no centro, o que tem borda nítida contra um fundo
+      mais uniforme. Para cada pixel da sua foto ele responde uma pergunta só —
+      isto faz parte do objeto? — e o resultado é uma máscara em tons de cinza
+      que vira a transparência do arquivo final.
+    </p>
+    <p>
+      Ele acerta quase sempre em foto de produto, pessoa e animal. Erra mais
+      quando o fundo tem a mesma cor do objeto, quando a imagem está desfocada,
+      quando há várias coisas disputando a atenção, e em regiões de contorno
+      fino como cabelo solto, pelo, franja de tecido e alça de bolsa.
+    </p>
+
+    <h2>Quando ela erra, o pincel resolve</h2>
+    <p>
+      Clique em <em>Editar</em> no cartão do resultado. O pincel tem dois modos:
+    </p>
+    <ul class="conteudo-lista">
+      <li>
+        <strong>Apagar</strong> — tira pedaços que ficaram sobrando. Serve para
+        aquele resto de parede que continuou colado no ombro.
+      </li>
+      <li>
+        <strong>Restaurar</strong> — devolve o que a IA comeu por engano. Serve
+        para o cabelo que sumiu ou a ponta do produto que virou transparente.
+      </li>
+    </ul>
+    <p>
+      Dois controles mudam o resultado bastante: o <strong>tamanho</strong>, para
+      trabalhar rente à borda sem invadir o resto, e a <strong>dureza</strong>,
+      que decide se a pincelada tem corte seco ou transição suave. Para cabelo,
+      dureza baixa fica muito melhor. Errou a pincelada? <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+    </p>
+    <p>
+      Marque <em>Ver o que sobrou em vermelho</em> para enxergar exatamente onde
+      ainda há fundo. Contra o xadrez de transparência, sobra fina quase não
+      aparece — em vermelho, salta.
+    </p>
+
+    <h2>Transparente, colorido, PNG ou JPG</h2>
+    <p>
+      Depois do recorte você escolhe o que fica atrás: nada (transparente), uma
+      cor pronta ou uma cor sua. E escolhe o formato do arquivo, que é onde mora
+      a pegadinha:
+    </p>
+    <ul class="conteudo-lista">
+      <li>
+        <strong>PNG</strong> guarda transparência. É o que você quer se vai usar
+        a imagem sobre outro fundo — num site, numa arte, num catálogo.
+      </li>
+      <li>
+        <strong>JPG</strong> gera arquivo bem menor, mas <em>não</em> guarda
+        transparência: o que era vazio sai branco. Só use se você já definiu um
+        fundo colorido ou se o branco serve.
+      </li>
+    </ul>
+    <p>
+      A <strong>suavização de borda</strong> ajuda quando o recorte ficou com
+      serrilhado. Um ou dois pixels costumam bastar; muito mais que isso começa a
+      comer o contorno.
+    </p>
+
+    <h2>Várias imagens de uma vez</h2>
+    <p>
+      Solte quantas quiser na área de cima — ou cole com
+      <kbd>Ctrl</kbd>+<kbd>V</kbd>. Elas entram numa fila e são processadas uma
+      após a outra, porque rodar tudo em paralelo travaria o navegador. O fundo
+      e a suavização que você escolher valem para todas, e no fim dá para baixar
+      o conjunto num arquivo .zip.
+    </p>
+
+    <h2>Perguntas frequentes</h2>
+
+    <details class="faq">
+      <summary>Por que a primeira imagem demora mais?</summary>
+      <p>
+        Porque o navegador está baixando o modelo de IA, cerca de 44 MB. Ele
+        fica guardado depois disso, então da segunda imagem em diante o recorte
+        começa quase na hora — inclusive em visitas futuras.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Qual a diferença entre "Padrão" e "Detalhes finos"?</summary>
+      <p>
+        São dois modelos de IA diferentes. O padrão é rápido e funciona bem na
+        maioria das fotos. O "Detalhes finos" é mais cuidadoso em contorno
+        complicado, como cabelo e pelo, e faz parte do plano VIP. Medindo os
+        dois em imagens de teste, a diferença existe mas é pequena — não espere
+        um salto.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>O que é a segunda passada em alta resolução?</summary>
+      <p>
+        O modelo trabalha numa versão reduzida da imagem. A segunda passada
+        localiza o objeto, recorta um pedaço em volta dele e roda o modelo de
+        novo só ali, com mais pixels disponíveis. O ganho aparece principalmente
+        em objeto pequeno dentro de foto grande. Medimos a diferença numa imagem
+        de teste: a precisão do recorte subiu de 96,7% para 98,4%.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Existe limite de tamanho ou de quantidade?</summary>
+      <p>
+        Não há limite de quantidade. Imagens muito grandes são reduzidas para
+        3000 pixels no maior lado antes do processamento, por memória — acima
+        disso o navegador começa a engasgar. O download respeita o tamanho
+        original quando você tem VIP.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Minha foto é enviada para algum servidor?</summary>
+      <p>
+        Não. O modelo é baixado para o seu navegador e roda na sua máquina. Você
+        pode conferir: depois que a página carregou, desligue a internet e o
+        recorte continua funcionando.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Funciona no celular?</summary>
+      <p>
+        Funciona, mas é mais lento — celular tem menos memória e processador mais
+        modesto que computador. Em aparelho antigo, imagem muito grande pode
+        travar. Se acontecer, tente uma foto menor.
+      </p>
+    </details>
+
+  </section>
 </main>
 
 <script type="module">

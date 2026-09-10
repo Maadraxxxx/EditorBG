@@ -27,10 +27,143 @@
 
 <script type="module">
   // O editor ocupa a página inteira: injeta o markup e entrega o controle a editar.js.
+  //
+  // 'afterbegin' e não 'beforeend': o texto abaixo já está no HTML, e o editor
+  // precisa vir ANTES dele na ordem do documento para o texto ficar embaixo da
+  // ferramenta, não em cima.
   const html = await fetch('partials/editor').then((r) => r.text());
-  document.body.insertAdjacentHTML('beforeend', html);
+  document.body.insertAdjacentHTML('afterbegin', html);
   await import('./js/editar.js');
 </script>
+
+<!-- ==================================================================
+     Texto da página. Fica visível enquanto não há imagem aberta; assim
+     que alguém carrega uma foto, o editor toma a tela e isto some
+     (js/editar.js põe a classe `com-imagem` no body).
+     ================================================================== -->
+<section class="conteudo">
+
+  <h2>Recortar e redimensionar não são a mesma coisa</h2>
+  <p>
+    As duas ferramentas mudam o tamanho do arquivo final, e é por isso que se
+    confundem — mas o que elas fazem é oposto.
+  </p>
+  <ul class="conteudo-lista">
+    <li>
+      <strong>Recortar</strong> joga fora uma parte da imagem. Você escolhe um
+      pedaço e o resto deixa de existir. Serve para tirar o que sobra nas
+      bordas, centralizar o assunto ou mudar a proporção.
+    </li>
+    <li>
+      <strong>Redimensionar</strong> mantém a imagem inteira e muda quantos
+      pixels ela tem. Nada é jogado fora; tudo é esticado ou encolhido. Serve
+      para atender a uma medida exigida — 1080×1080 para o Instagram, uma
+      largura máxima para o site.
+    </li>
+  </ul>
+  <p>
+    Precisa dos dois? Recorte primeiro, depois redimensione. Na ordem inversa o
+    recorte desfaz parte do trabalho de ajustar a medida.
+  </p>
+
+  <h3>Proporções fixas</h3>
+  <p>
+    No recorte, travar a proporção (1:1, 3:4, 16:9, 9:16) garante que a moldura
+    não saia torta enquanto você arrasta. <em>Cortar rente ao objeto</em> acha
+    sozinho a menor moldura que ainda cabe tudo o que não é transparente —
+    prático para imagem que já passou pela remoção de fundo.
+  </p>
+
+  <h3>Manter proporção ao redimensionar</h3>
+  <p>
+    Com essa opção ligada, mexer na largura ajusta a altura junto e a imagem não
+    distorce. Desligue só quando você precisa de uma medida exata em ambos os
+    lados e não se importa que a foto estique.
+  </p>
+
+  <h2>O que cada ajuste faz</h2>
+  <p>
+    São treze controles, e vale saber a diferença entre os que parecem iguais:
+  </p>
+  <ul class="conteudo-lista">
+    <li>
+      <strong>Brilho</strong> clareia tudo por igual. <strong>Exposição</strong>
+      faz parecido, mas mexendo mais nas partes claras — costuma ficar mais
+      natural em foto.
+    </li>
+    <li>
+      <strong>Destaques</strong> e <strong>Sombras</strong> agem em faixas
+      separadas. Foto com céu estourado e primeiro plano escuro se resolve
+      baixando destaques e levantando sombras, sem tocar no resto.
+    </li>
+    <li>
+      <strong>Saturação</strong> puxa todas as cores. <strong>Vibração</strong>
+      poupa as que já estão fortes, então pele fica menos laranja.
+    </li>
+    <li>
+      <strong>Nitidez</strong> reforça a borda que já existe.
+      <strong>Claridade</strong> trabalha o contraste no meio-tom e dá impressão
+      de textura. Nenhuma das duas inventa detalhe que a foto não tem.
+    </li>
+  </ul>
+
+  <h2>Texto, formas e imagens por cima</h2>
+  <p>
+    Além de ajustar a foto, dá para empilhar coisas sobre ela: caixas de texto
+    com fonte, tamanho, cor e alinhamento; formas prontas como retângulo,
+    círculo, seta e balão; e outras imagens, por cima da primeira. Tudo pode ser
+    movido, girado e redimensionado arrastando. A ordem das camadas muda no
+    painel lateral — o que está em cima na lista aparece na frente.
+  </p>
+
+  <h2>Perguntas frequentes</h2>
+
+  <details class="faq">
+    <summary>Preciso de conta para editar?</summary>
+    <p>
+      Não. A edição inteira funciona sem cadastro. A conta serve para duas
+      coisas: guardar a última imagem que você estava editando, para continuar
+      depois, e assinar o VIP se quiser baixar na resolução original.
+    </p>
+  </details>
+
+  <details class="faq">
+    <summary>Como volto atrás se errei?</summary>
+    <p>
+      <kbd>Ctrl</kbd>+<kbd>Z</kbd> desfaz a última ação, ou o botão
+      <em>Desfazer</em> na barra de cima. Para começar do zero,
+      <em>Voltar ao original</em> descarta todas as edições de uma vez.
+    </p>
+  </details>
+
+  <details class="faq">
+    <summary>Perco qualidade ao editar?</summary>
+    <p>
+      Os ajustes e o recorte trabalham sobre a imagem original, não sobre uma
+      versão já reduzida. Aumentar o tamanho além do original, porém, não cria
+      detalhe: os pixels são esticados. Reduzir é seguro; ampliar muito, não.
+    </p>
+  </details>
+
+  <details class="faq">
+    <summary>Dá para deixar o fundo transparente aqui?</summary>
+    <p>
+      Aqui você edita a imagem como ela é. Para tirar o fundo, use a
+      <a href="/remover-fundo">remoção de fundo com IA</a> — o resultado de lá
+      abre neste mesmo editor.
+    </p>
+  </details>
+
+  <details class="faq">
+    <summary>Em que formato o arquivo é salvo?</summary>
+    <p>
+      Você escolhe entre PNG e JPG na barra de cima, antes de baixar. PNG guarda
+      transparência; JPG gera arquivo menor e pinta de branco o que era
+      transparente.
+    </p>
+  </details>
+
+</section>
 
 </body>
 </html>

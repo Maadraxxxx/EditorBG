@@ -32,6 +32,9 @@ function mostrarVazio() {
   root.hidden = false;
   empty.hidden = false;
   root.classList.add('is-empty');
+  // O texto da página só faz sentido enquanto não há imagem: com o editor
+  // aberto ele estaria atrás de uma tela cheia, inalcançável.
+  document.body.classList.remove('com-imagem');
 }
 
 mostrarVazio();
@@ -107,6 +110,7 @@ async function carregar(file) {
 
 function abrirItem(item) {
   root.classList.remove('is-empty');
+  document.body.classList.add('com-imagem');
   $('edRetomar').hidden = true;
   openEditor(item, {
     background: 'transparent',

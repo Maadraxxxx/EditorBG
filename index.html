@@ -52,6 +52,54 @@
     ]
   }
   </script>
+
+  <!-- As mesmas perguntas que estão escritas na página, em formato de máquina.
+       É o que permite o Google mostrar as perguntas direto no resultado da
+       busca. TEM que continuar batendo com o <section class="conteudo"> lá
+       embaixo: o Google penaliza FAQ estruturado que não existe na página. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "É grátis mesmo?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Sim, e sem cadastro. A versão grátis entrega o arquivo com 30% menos resolução do que o original. Quem quer o tamanho cheio, o recorte refinado em duas passadas e o modelo de IA mais detalhado pode assinar o VIP a partir de R$ 4,90 por um mês." }
+      },
+      {
+        "@type": "Question",
+        "name": "Preciso instalar alguma coisa?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Não. Funciona em qualquer navegador atualizado — Chrome, Edge, Firefox, Safari — no computador ou no celular. Não há extensão, programa nem aplicativo para baixar." }
+      },
+      {
+        "@type": "Question",
+        "name": "Quais formatos de imagem funcionam?",
+        "acceptedAnswer": { "@type": "Answer", "text": "PNG, JPG e WEBP na entrada. Na saída você escolhe entre PNG, que guarda a transparência, e JPG, que gera arquivo menor mas troca a transparência por fundo branco." }
+      },
+      {
+        "@type": "Question",
+        "name": "Minhas imagens ficam guardadas em algum lugar?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No servidor, nunca. Se você tiver conta, a última imagem que estava editando fica guardada dentro do seu próprio navegador, para você conseguir continuar depois — e some quando você clica em descartar ou limpa os dados do site." }
+      },
+      {
+        "@type": "Question",
+        "name": "A IA errou o recorte. E agora?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Clique em Editar e use o pincel. Ele tem dois modos: apagar, que tira o que sobrou do fundo, e restaurar, que devolve o pedaço do objeto que a IA comeu por engano. Dá para mudar o tamanho e a dureza da borda do pincel, e desfazer com Ctrl+Z." }
+      },
+      {
+        "@type": "Question",
+        "name": "Dá para processar várias imagens de uma vez?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Dá. Solte quantas quiser na página de remover fundo: elas entram numa fila e são recortadas uma após a outra. No fim você pode baixar todas juntas num arquivo .zip." }
+      },
+      {
+        "@type": "Question",
+        "name": "Funciona sem internet?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Depois que a página e o modelo carregaram, sim — o recorte em si não precisa de rede. Você só precisa de conexão para abrir o site da primeira vez e para assinar o VIP." }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
 
@@ -121,6 +169,136 @@
       <span class="home-go">Começar →</span>
     </a>
   </nav>
+
+  <!-- ================================================================
+       Texto de verdade, abaixo das ferramentas.
+       Fica DEPOIS dos cards de propósito: quem chegou para usar o site
+       clica e vai embora sem precisar ler nada. Quem chegou pelo Google
+       encontra as respostas que a busca prometeu.
+       ================================================================ -->
+  <section class="conteudo">
+
+    <h2>Como funciona</h2>
+    <p>
+      Você escolhe uma imagem, o site faz o trabalho e você baixa o resultado.
+      A diferença está no meio: nada disso acontece num servidor. O modelo de
+      inteligência artificial é baixado uma vez para o seu navegador e roda ali,
+      na sua máquina, usando o seu processador.
+    </p>
+    <ol class="conteudo-passos">
+      <li>
+        <strong>Adicione a imagem.</strong> Arraste para a página, cole com
+        <kbd>Ctrl</kbd>+<kbd>V</kbd> ou escolha no computador. Dá para soltar
+        várias de uma vez na remoção de fundo.
+      </li>
+      <li>
+        <strong>Espere alguns segundos.</strong> Na primeira vez o navegador
+        baixa o modelo (cerca de 44 MB). Nas próximas ele já está guardado e o
+        recorte começa na hora.
+      </li>
+      <li>
+        <strong>Ajuste o que ficou torto.</strong> O pincel apaga ou devolve
+        pedaços do fundo. É onde você conserta cabelo, alça de bolsa e outras
+        coisas que a IA costuma comer.
+      </li>
+      <li>
+        <strong>Baixe.</strong> PNG mantém o fundo transparente; JPG deixa o
+        arquivo mais leve, mas pinta de branco o que era transparente.
+      </li>
+    </ol>
+
+    <h2>Por que rodar no navegador muda alguma coisa</h2>
+    <p>
+      A maioria dos sites que removem fundo envia a sua imagem para o servidor
+      deles, processa lá e devolve o resultado. Funciona bem — e significa que
+      uma cópia da sua foto passou pela máquina de outra pessoa, sujeita à
+      política de privacidade dela e a qualquer coisa que aconteça com aquele
+      servidor depois.
+    </p>
+    <p>
+      Aqui a imagem não sai do seu computador. Não existe upload, não existe
+      cópia num bucket, e você pode desligar a internet depois que a página
+      carregou que o recorte continua funcionando. Isso importa se você mexe
+      com documento, foto de cliente, produto que ainda não foi lançado ou
+      qualquer coisa que você não mandaria para um desconhecido.
+    </p>
+    <p class="conteudo-honesto">
+      <strong>O preço dessa escolha:</strong> a primeira visita é mais lenta,
+      porque o modelo precisa ser baixado. E o recorte depende do seu
+      computador — numa máquina antiga demora mais do que num servidor
+      dedicado. Achamos a troca justa; se você discorda, existem ótimas
+      alternativas que processam na nuvem.
+    </p>
+
+    <h2>Perguntas frequentes</h2>
+
+    <details class="faq">
+      <summary>É grátis mesmo?</summary>
+      <p>
+        Sim, e sem cadastro. A versão grátis entrega o arquivo com 30% menos
+        resolução do que o original. Quem quer o tamanho cheio, o recorte
+        refinado em duas passadas e o modelo de IA mais detalhado pode assinar
+        o VIP a partir de R$ 4,90 por um mês.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Preciso instalar alguma coisa?</summary>
+      <p>
+        Não. Funciona em qualquer navegador atualizado — Chrome, Edge, Firefox,
+        Safari — no computador ou no celular. Não há extensão, programa nem
+        aplicativo para baixar.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Quais formatos de imagem funcionam?</summary>
+      <p>
+        PNG, JPG e WEBP na entrada. Na saída você escolhe entre PNG, que guarda
+        a transparência, e JPG, que gera arquivo menor mas troca a
+        transparência por fundo branco.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Minhas imagens ficam guardadas em algum lugar?</summary>
+      <p>
+        No servidor, nunca. Se você tiver conta, a última imagem que estava
+        editando fica guardada dentro do seu próprio navegador, para você
+        conseguir continuar depois — e some quando você clica em descartar ou
+        limpa os dados do site. Ninguém além de você alcança isso, nem nós.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>A IA errou o recorte. E agora?</summary>
+      <p>
+        Clique em <em>Editar</em> e use o pincel. Ele tem dois modos: apagar,
+        que tira o que sobrou do fundo, e restaurar, que devolve o pedaço do
+        objeto que a IA comeu por engano. Dá para mudar o tamanho e a dureza da
+        borda do pincel, e desfazer com <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Dá para processar várias imagens de uma vez?</summary>
+      <p>
+        Dá. Solte quantas quiser na página de remover fundo: elas entram numa
+        fila e são recortadas uma após a outra. No fim você pode baixar todas
+        juntas num arquivo .zip.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Funciona sem internet?</summary>
+      <p>
+        Depois que a página e o modelo carregaram, sim — o recorte em si não
+        precisa de rede. Você só precisa de conexão para abrir o site da
+        primeira vez e para assinar o VIP.
+      </p>
+    </details>
+
+  </section>
 </main>
 
 <!-- O botao "Entrar" se encaixa sozinho na .topbar, que ja e space-between:
