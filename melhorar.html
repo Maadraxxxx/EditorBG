@@ -47,13 +47,14 @@
 
 <main>
 
-  <!-- ENTRADA -->
-  <section class="drop" id="drop">
-    <input type="file" id="file" accept="image/*" hidden />
-    <div class="drop-icon" aria-hidden="true">✨</div>
+  <!-- ENTRADA — mesmas classes da página de remover fundo, para as duas
+       telas de "solte a imagem aqui" serem visivelmente a mesma coisa. -->
+  <section class="dropzone" id="drop" tabindex="0" role="button" aria-label="Escolher imagem">
+    <div class="dz-icon">✨</div>
     <h2>Arraste sua imagem aqui</h2>
-    <p>ou <button type="button" class="link-botao" id="escolher">clique para escolher</button> · você também pode colar com <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
+    <p>ou <span class="link">clique para escolher</span> · você também pode colar com <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
     <small>PNG, JPG, WEBP · nada é enviado para servidores</small>
+    <input type="file" id="file" accept="image/*" hidden />
   </section>
 
   <!-- RESULTADO -->
@@ -101,6 +102,7 @@
         <button class="btn ghost full" id="botaoIA">Dobrar com IA</button>
         <div class="mq-barra" id="iaBarra" hidden><div id="iaPreenche"></div></div>
         <p class="mq-nota" id="iaEstado" hidden></p>
+        <button class="link-botao" id="cancelarIA" hidden>Cancelar</button>
       </div>
 
       <p class="hd-aviso" id="aviso"></p>
@@ -132,24 +134,40 @@
     </p>
     <p>
       A <strong>ampliação com IA</strong> é outra coisa: um modelo treinado em
-      milhares de imagens preenche o dobro de pixels com detalhe plausível.
-      Funciona bem, e é lenta — por isso só aparece em imagem pequena, com o
-      tempo estimado escrito antes de você começar.
+      milhares de imagens preenche o dobro de pixels com detalhe plausível. Ela
+      aceita qualquer tamanho — e é lenta, então o tempo estimado aparece
+      escrito no botão antes de você clicar.
     </p>
 
-    <h2>Por que a IA só aceita imagem pequena</h2>
+    <h2>Quanto tempo a IA demora</h2>
     <p>
-      Porque ela roda no seu computador, não num servidor nosso. Medimos: o
-      modelo leva cerca de <strong>0,32 milissegundo por pixel</strong> de
-      entrada. Uma imagem de 500×500 leva perto de um minuto e meio; uma de
-      1000×1000 passaria de cinco minutos; uma foto de celular inteira levaria
-      quase uma hora.
+      Depende do tamanho, e a conta é direta: o modelo leva cerca de
+      <strong>0,4 milissegundo por pixel</strong>, medido aqui. Na prática:
+    </p>
+    <ul class="conteudo-lista">
+      <li><strong>400×300</strong> — perto de <strong>1 minuto</strong></li>
+      <li><strong>800×600</strong> — perto de <strong>3 minutos</strong></li>
+      <li><strong>1200×900</strong> — perto de <strong>7 minutos</strong></li>
+      <li><strong>2000×1500</strong> — perto de <strong>20 minutos</strong></li>
+    </ul>
+    <p>
+      Acima de dois minutos o site pede confirmação antes de começar, e mostra
+      quantos pedaços faltam enquanto trabalha — com a estimativa se corrigindo
+      pelo ritmo real da sua máquina, que é mais confiável que a conta teórica.
+      Dá para cancelar a qualquer momento.
+    </p>
+    <p>
+      A imagem é processada em pedaços, e não de uma vez. Não é só por
+      velocidade: de uma vez só, uma foto grande estouraria a memória do
+      navegador no meio do caminho, depois de você já ter esperado.
     </p>
     <p class="conteudo-honesto">
-      Poderíamos processar num servidor e entregar em segundos. Não fazemos
-      porque isso significaria enviar a sua imagem para a nossa máquina, e o
-      site inteiro se apoia na promessa de que isso não acontece. O limite de
-      tamanho é o preço dessa escolha, e achamos que vale.
+      Por que não é instantâneo como nos concorrentes: eles processam num
+      servidor. Nós poderíamos fazer o mesmo e entregar em segundos — mas isso
+      significaria enviar a sua imagem para a nossa máquina, e o site inteiro se
+      apoia na promessa de que isso não acontece. A espera é o preço dessa
+      escolha. Se ela não valer a pena para você numa foto específica, a
+      melhoria instantânea continua ali e sai na hora.
     </p>
 
     <h2>Perguntas frequentes</h2>

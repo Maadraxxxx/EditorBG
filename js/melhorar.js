@@ -19,12 +19,42 @@
  */
 import { aplicarAjustes } from './adjust.js';
 
-/** Acima disso a IA não é oferecida: a conta de tempo deixa de fechar. */
-export const TETO_IA = 600;
+/* ------------------------------------------------------------------ *
+ * Ladrilhos
+ * ------------------------------------------------------------------ *
+ * A IA aceita qualquer tamanho, e é por isso que ela processa em pedaços.
+ *
+ * Uma imagem grande de uma vez só não é apenas lenta: os tensores intermediários
+ * do modelo crescem com o número de pixels, e o WASM tem teto de memória. Uma
+ * foto de 3000 px estouraria antes de terminar, depois de ter feito a pessoa
+ * esperar. Em ladrilhos o pico de memória fica igual para qualquer tamanho.
+ *
+ * Cada ladrilho é processado com uma margem em volta e depois recortado ao
+ * miolo. Essa margem existe para não haver emenda: o modelo se comporta
+ * diferente na beira do que recebe, e sem contexto ao redor as costuras
+ * apareceriam como uma grade sobre a foto inteira.
+ */
+const LADRILHO = 192;
+const MARGEM = 16;
 
-/** Segundos aproximados que a IA vai levar, para avisar antes de começar. */
+/**
+ * Custo medido: 0,32 ms por pixel de entrada. A margem faz cada ladrilho
+ * processar mais pixels do que aproveita, e esse desperdício entra na conta —
+ * senão a estimativa mentiria para baixo justamente nas imagens grandes, que
+ * são as que precisam de aviso.
+ */
+const MS_POR_PIXEL = 0.00032;
+const DESPERDICIO = ((LADRILHO + 2 * MARGEM) ** 2) / (LADRILHO ** 2);
+
 export function estimarSegundos(largura, altura) {
-  return Math.max(5, Math.round(largura * altura * 0.00032));
+  return Math.max(5, Math.round(largura * altura * MS_POR_PIXEL * DESPERDICIO));
+}
+
+/** "40 segundos", "cerca de 6 minutos" — para escrever na tela. */
+export function tempoEscrito(segundos) {
+  if (segundos < 90) return Math.round(segundos) + ' segundos';
+  const min = Math.round(segundos / 60);
+  return 'cerca de ' + min + (min === 1 ? ' minuto' : ' minutos');
 }
 
 /* ------------------------------------------------------------------ *
@@ -288,12 +318,7 @@ function carregarIA(aoProgredir) {
  *
  * @param {(fase: string, fracao: number) => void} aoProgredir  0 a 1
  */
-export async function comIA(fonte, aoProgredir = () => {}) {
-  const maior = Math.max(fonte.width, fonte.height);
-  if (maior > TETO_IA) {
-    throw new Error('Esta imagem é grande demais para a IA (máximo ' + TETO_IA + ' px de lado).');
-  }
-
+export async function comIA(fonte, aoProgredir = () => {}, deveParar = () => false) {
   aoProgredir('baixando', 0);
   const modelo = await carregarIA((p) => {
     if (p && p.status === 'progress' && p.total) {
@@ -301,26 +326,74 @@ export async function comIA(fonte, aoProgredir = () => {}) {
     }
   });
 
-  aoProgredir('processando', 0);
-
   const { RawImage } = await import(
     'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1'
   );
-  const blob = await new Promise((r) => paraCanvas(fonte).toBlob(r, 'image/png'));
-  const entrada = await RawImage.fromBlob(blob);
 
-  const saida = await modelo(entrada);
-  aoProgredir('pronto', 1);
+  const entrada = paraCanvas(fonte);
+  const saida = document.createElement('canvas');
+  saida.width = entrada.width * 2;
+  saida.height = entrada.height * 2;
+  const ctxSaida = saida.getContext('2d');
 
-  // O modelo devolve RawImage; vira canvas para o resto do site trabalhar.
-  const c = document.createElement('canvas');
-  c.width = saida.width;
-  c.height = saida.height;
-  c.getContext('2d').putImageData(
-    new ImageData(new Uint8ClampedArray(paraRGBA(saida)), saida.width, saida.height),
-    0, 0
-  );
-  return c;
+  const colunas = Math.ceil(entrada.width / LADRILHO);
+  const linhas = Math.ceil(entrada.height / LADRILHO);
+  const total = colunas * linhas;
+  let feitos = 0;
+
+  aoProgredir('processando', 0, { feitos, total });
+
+  for (let ly = 0; ly < linhas; ly++) {
+    for (let lx = 0; lx < colunas; lx++) {
+      if (deveParar()) throw new Error('cancelado');
+
+      // Miolo que este ladrilho é responsável por preencher.
+      const mx = lx * LADRILHO;
+      const my = ly * LADRILHO;
+      const mw = Math.min(LADRILHO, entrada.width - mx);
+      const mh = Math.min(LADRILHO, entrada.height - my);
+
+      // Recorte maior, com margem, para o modelo ter contexto nas beiras.
+      const rx = Math.max(0, mx - MARGEM);
+      const ry = Math.max(0, my - MARGEM);
+      const rw = Math.min(entrada.width, mx + mw + MARGEM) - rx;
+      const rh = Math.min(entrada.height, my + mh + MARGEM) - ry;
+
+      const pedaco = document.createElement('canvas');
+      pedaco.width = rw;
+      pedaco.height = rh;
+      pedaco.getContext('2d').drawImage(entrada, rx, ry, rw, rh, 0, 0, rw, rh);
+
+      const blob = await new Promise((r) => pedaco.toBlob(r, 'image/png'));
+      const dobrado = await modelo(await RawImage.fromBlob(blob));
+
+      const cv = document.createElement('canvas');
+      cv.width = dobrado.width;
+      cv.height = dobrado.height;
+      cv.getContext('2d').putImageData(
+        new ImageData(new Uint8ClampedArray(paraRGBA(dobrado)), dobrado.width, dobrado.height),
+        0, 0
+      );
+
+      // Descarta a margem e cola só o miolo: a margem existiu para dar
+      // contexto ao modelo, não para aparecer no resultado.
+      ctxSaida.drawImage(
+        cv,
+        (mx - rx) * 2, (my - ry) * 2, mw * 2, mh * 2,
+        mx * 2, my * 2, mw * 2, mh * 2
+      );
+
+      feitos++;
+      aoProgredir('processando', feitos / total, { feitos, total });
+
+      // Devolve o controle ao navegador entre ladrilhos: sem isto a aba
+      // congela e o progresso na tela nunca chega a ser desenhado.
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+
+  aoProgredir('pronto', 1, { feitos, total });
+  return saida;
 }
 
 /** O modelo devolve 3 canais; o canvas quer 4. */

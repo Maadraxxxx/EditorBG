@@ -22,9 +22,9 @@ let usouCota = false;   // a cota é gasta uma vez por imagem, não por ajuste
 /* ------------------------------------------------------------------ *
  * Entrada
  * ------------------------------------------------------------------ */
-$('escolher').addEventListener('click', () => $('file').click());
-$('drop').addEventListener('click', (e) => {
-  if (!e.target.closest('button')) $('file').click();
+$('drop').addEventListener('click', () => $('file').click());
+$('drop').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); }
 });
 $('file').addEventListener('change', () => {
   if ($('file').files[0]) carregar($('file').files[0]);
@@ -184,35 +184,73 @@ function semCota(limite) {
  * Ampliação com IA
  * ------------------------------------------------------------------ */
 function prepararIA() {
-  const cabe = Math.max(original.width, original.height) <= M.TETO_IA;
-  const botao = $('botaoIA');
+  const segundos = M.estimarSegundos(original.width, original.height);
+  const nota = $('iaNota');
 
-  botao.disabled = !cabe;
+  $('botaoIA').disabled = false;
+  $('botaoIA').textContent = 'Dobrar com IA · ' + M.tempoEscrito(segundos);
   $('iaBarra').hidden = true;
   $('iaEstado').hidden = true;
 
-  $('iaNota').textContent = cabe
-    ? 'Dobra a resolução com IA. Leva cerca de ' + M.estimarSegundos(original.width, original.height)
-      + ' s nesta imagem, e roda no seu computador.'
-    : 'Só para imagens de até ' + M.TETO_IA + ' px de lado — acima disso a IA levaria minutos demais. '
-      + 'Esta tem ' + Math.max(original.width, original.height) + ' px.';
+  nota.textContent =
+    'Vai de ' + original.width + '×' + original.height + ' para '
+    + (original.width * 2) + '×' + (original.height * 2) + '. '
+    + 'Nesta imagem leva ' + M.tempoEscrito(segundos) + ', rodando no SEU computador — '
+    + 'a aba precisa ficar aberta.';
+
+  // Acima de dois minutos o aviso deixa de ser informação e passa a ser
+  // decisão: quem não souber quanto tempo vai esperar, desiste no meio.
+  nota.className = segundos > 120 ? 'mq-nota mq-demora' : 'mq-nota';
 }
+
+let cancelar = false;
 
 $('botaoIA').addEventListener('click', async () => {
   if (!original) return;
 
   const botao = $('botaoIA');
+  const segundos = M.estimarSegundos(original.width, original.height);
+
+  // Espera longa merece confirmação. Começar sem avisar e a pessoa descobrir
+  // dez minutos depois é o pior desfecho possível aqui.
+  if (segundos > 120) {
+    const ok = confirm(
+      'Esta imagem vai levar ' + M.tempoEscrito(segundos) + ' para dobrar.\n\n'
+      + 'O processamento acontece no seu computador e a aba precisa ficar aberta '
+      + 'o tempo todo. Você pode cancelar no meio.\n\nComeçar?'
+    );
+    if (!ok) return;
+  }
+
+  cancelar = false;
   botao.disabled = true;
+  $('cancelarIA').hidden = false;
   $('iaBarra').hidden = false;
   $('iaEstado').hidden = false;
 
+  const comecou = Date.now();
+
   try {
-    const dobrado = await M.comIA(original, (fase, fracao) => {
+    const dobrado = await M.comIA(original, (fase, fracao, info) => {
       $('iaPreenche').style.width = Math.round(fracao * 100) + '%';
-      $('iaEstado').textContent = fase === 'baixando'
-        ? 'Baixando o modelo… ' + Math.round(fracao * 100) + '%'
-        : 'Processando — pode demorar, não feche a aba.';
-    });
+
+      if (fase === 'baixando') {
+        $('iaEstado').textContent = 'Baixando o modelo… ' + Math.round(fracao * 100) + '%';
+        return;
+      }
+      if (!info || !info.feitos) {
+        $('iaEstado').textContent = 'Preparando…';
+        return;
+      }
+
+      // Estimativa que se corrige sozinha: depois do primeiro pedaço já dá para
+      // medir o ritmo desta máquina em vez de repetir o número teórico.
+      const decorrido = (Date.now() - comecou) / 1000;
+      const faltam = Math.round(decorrido / info.feitos * (info.total - info.feitos));
+      $('iaEstado').textContent =
+        'Pedaço ' + info.feitos + ' de ' + info.total
+        + ' · faltam ' + M.tempoEscrito(faltam);
+    }, () => cancelar);
 
     // Depois de dobrar, os ajustes finos entram por cima do resultado da IA.
     atual = M.rapido(dobrado, {
@@ -224,11 +262,20 @@ $('botaoIA').addEventListener('click', async () => {
 
     $('iaEstado').textContent = 'Pronto: ' + atual.width + ' × ' + atual.height + ' px.';
     $('iaBarra').hidden = true;
+    $('cancelarIA').hidden = true;
   } catch (err) {
-    $('iaEstado').textContent = err.message;
+    $('iaEstado').textContent = err.message === 'cancelado'
+      ? 'Cancelado. A imagem continua como estava.'
+      : err.message;
     $('iaBarra').hidden = true;
+    $('cancelarIA').hidden = true;
     botao.disabled = false;
   }
+});
+
+$('cancelarIA').addEventListener('click', () => {
+  cancelar = true;
+  $('iaEstado').textContent = 'Cancelando no fim deste pedaço…';
 });
 
 /* ------------------------------------------------------------------ *

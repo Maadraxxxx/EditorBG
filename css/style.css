@@ -1976,3 +1976,14 @@ body[data-mode="editor"] .conteudo {
 @media (max-width: 860px) {
   .mq { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Aviso de espera longa na ampliação com IA. Amarelo porque é uma decisão a
+   tomar, não um erro — e porque minutos de espera precisam ser lidos. */
+.mq-demora {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, .07);
+  border: 1px solid rgba(245, 158, 11, .25);
+  border-radius: 9px;
+  padding: 9px 11px;
+}
+#cancelarIA { justify-self: center; font-size: 11.5px; }
