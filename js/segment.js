@@ -51,6 +51,25 @@ export function hasWebGPU() {
   return gpuPromise;
 }
 
+/**
+ * Teto de espera por passada, e SO na placa de video.
+ *
+ * No processador uma foto grande leva minutos legitimamente — cortar ali
+ * quebraria justamente as maquinas lentas, que sao as que mais precisam
+ * funcionar. Na placa, uma passada que nao volta em 60 segundos nao vai voltar.
+ */
+const TETO_POR_PASSADA = 60000;
+
+function comPrazo(promessa, ms) {
+  let alarme;
+  return Promise.race([
+    Promise.resolve(promessa).finally(() => clearTimeout(alarme)),
+    new Promise((_, rejeitar) => {
+      alarme = setTimeout(() => rejeitar(new Error('nao respondeu a tempo')), ms);
+    }),
+  ]);
+}
+
 /* ------------------------------------------------------------------ *
  * Carregamento
  * ------------------------------------------------------------------ */
@@ -69,19 +88,50 @@ export async function loadSegmenter(key, { onProgress } = {}) {
   }
 
   const spec = MODELS[key];
-  const device = (await hasWebGPU()) ? 'webgpu' : 'wasm';
-  const segmenter = await pipeline('background-removal', spec.id, {
-    device,
-    dtype: spec.dtype[device],
-    progress_callback: onProgress,
-  });
 
+  async function montar(device) {
+    return pipeline('background-removal', spec.id, {
+      device,
+      dtype: spec.dtype[device],
+      progress_callback: onProgress,
+    });
+  }
+
+  const device = (await hasWebGPU()) ? 'webgpu' : 'wasm';
+  const segmenter = await montar(device);
   current = { key, device, segmenter };
   return current;
 }
 
+
+/** Marca de versao, para conferir qual copia do modulo a pagina carregou. */
 export function currentDevice() {
   return current ? current.device : null;
+}
+
+let aoTrocar = null;
+/** A pagina usa isto para avisar que o motor mudou no meio do caminho. */
+export function aoTrocarMotor(fn) { aoTrocar = fn; }
+
+/**
+ * Recarrega o mesmo modelo no processador.
+ *
+ * Existe porque a placa de video as vezes aceita o modelo, reporta tudo pronto
+ * e depois simplesmente nao devolve resultado nenhum — visto aqui com o
+ * recorte travado em "Removendo o fundo..." por minutos. Sem esta queda, a
+ * pessoa fica esperando para sempre, sem erro e sem explicacao.
+ */
+async function cairParaProcessador() {
+  const spec = MODELS[current.key];
+  try { await current.segmenter.dispose(); } catch { /* ja liberado */ }
+
+  const segmenter = await pipeline('background-removal', spec.id, {
+    device: 'wasm',
+    dtype: spec.dtype.wasm,
+  });
+  current = { key: current.key, device: 'wasm', segmenter };
+  if (aoTrocar) aoTrocar('wasm');
+  return segmenter;
 }
 
 /* ------------------------------------------------------------------ *
@@ -98,7 +148,22 @@ async function segmentRegion(segmenter, bitmap, sx, sy, sw, sh) {
   const rgba = ctx.getImageData(0, 0, sw, sh);
 
   const input = new RawImage(rgba.data, sw, sh, 4).rgb();
-  const out = await segmenter(input);
+
+  // Sempre o segmentador vivo, e nao o que veio por parametro: depois de uma
+  // queda para o processador o de fora esta morto.
+  const motor = (current && current.segmenter) || segmenter;
+
+  let out;
+  if (current && current.device === 'webgpu') {
+    try {
+      out = await comPrazo(motor(input), TETO_POR_PASSADA);
+    } catch {
+      const noProcessador = await cairParaProcessador();
+      out = await noProcessador(input);
+    }
+  } else {
+    out = await motor(input);
+  }
   const res = Array.isArray(out) ? out[0] : out;
 
   return alphaToMask(res, sw, sh);

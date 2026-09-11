@@ -4,7 +4,9 @@
  * Nenhuma imagem é enviada para servidores.
  */
 import { compose, cloneCanvas, defaultEdit } from './compose.js';
-import { MODELS, loadSegmenter, segmentImage } from './segment.js';
+import { MODELS, loadSegmenter, segmentImage,
+  aoTrocarMotor,
+} from './segment.js';
 import { openEditor } from './editor.js';
 import { refreshSliders } from './sliders.js';
 import { baixar as baixarComPlano, abrirPaywall, temHD, aplicarLimite } from './paywall.js';
@@ -98,6 +100,14 @@ function setEngine(state, label) {
  * Carrega (ou reaproveita) o segmentador do modelo escolhido. Trocar de modelo
  * descarrega o anterior: dois modelos grandes no mesmo heap estouram a memória.
  */
+// A placa de video pode desistir no meio: quando isso acontece o segmentador
+// cai para o processador sozinho, e a etiqueta do motor precisa contar a
+// verdade em vez de continuar dizendo "placa de video".
+aoTrocarMotor((device) => {
+  setEngine('ready', MODELS[modelKey].nome + ' · '
+    + (device === 'webgpu' ? 'WebGPU (placa de vídeo)' : 'WASM (CPU)'));
+});
+
 function loadModel() {
   if (modelPromise && loadedKey === modelKey) return modelPromise;
 
