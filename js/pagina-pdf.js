@@ -12,6 +12,17 @@
  */
 import * as PDF from './pdf.js';
 
+/**
+ * O paywall entra por import dinâmico porque ele injeta o próprio markup com
+ * await no topo do módulo, e amarrar a página de PDF a isso atrasaria a
+ * abertura da grade por causa de um recurso que nem toda visita usa.
+ */
+let Paywall = null;
+const paywallPronto = import('./paywall.js').then((m) => { Paywall = m; return m; });
+
+/** VIP? Antes do paywall carregar a resposta é "não", que é o lado seguro. */
+const ehVip = () => !!(Paywall && Paywall.temHD());
+
 const $ = (id) => document.getElementById(id);
 
 /* ------------------------------------------------------------------ *
@@ -829,6 +840,25 @@ const FERRAMENTAS = [
 ];
 
 /**
+ * Ferramentas que rodam a MESMA operação em vários arquivos, uma de cada vez.
+ *
+ * É o que mais vale a pena para quem trabalha com isso: marcar cinquenta
+ * orçamentos, comprimir a pasta inteira do mês, numerar todos os contratos.
+ * Fazer isso um a um é o trabalho chato que a pessoa está tentando evitar.
+ *
+ * Ficam de fora as que já recebem vários por natureza (juntar, comparar), as
+ * que não recebem arquivo (HTML, câmera) e as que escolhem posição na página
+ * (recortar, assinar, editar, ocultar, formulários) — nessas a escolha vale
+ * para UM documento, e aplicar a mesma coordenada em cinquenta seria errado.
+ */
+const ACEITAM_LOTE = new Set([
+  'dividir', 'organizar', 'rodar', 'para-jpg', 'numeros', 'marca', 'comprimir',
+  'texto', 'markdown', 'ocr', 'proteger', 'desbloquear', 'reparar', 'pdfa',
+  'para-word', 'para-excel', 'para-ppt', 'de-word', 'de-excel', 'de-ppt',
+]);
+
+
+/**
  * A cor do ícone diz a que família a ferramenta pertence.
  *
  * Com 32 cartões na tela, cor é o que o olho lê antes do texto: quem procura
@@ -935,7 +965,10 @@ function abrir(f) {
   $('dropTipos').textContent = f.tipos || 'PDF · nada é enviado para servidores';
 
   $('file').accept = f.aceita;
-  $('file').multiple = !!f.varios;
+  // Em lote, quem escolhe vários precisa poder escolher vários. Para quem não
+  // é VIP o seletor também aceita: é ali que a oferta faz sentido, com os
+  // arquivos já na mão, e não num aviso solto antes.
+  $('file').multiple = !!f.varios || ACEITAM_LOTE.has(f.id);
 
   $('opcoes').innerHTML = f.controles ? f.controles() : '';
   $('extra').innerHTML = '';
@@ -943,7 +976,14 @@ function abrir(f) {
   $('aviso').hidden = !f.aviso;
   $('aviso').textContent = f.aviso || '';
 
-  $('limpar').textContent = f.varios ? 'Limpar a lista' : 'Trocar arquivo';
+  $('limpar').textContent = f.varios || ACEITAM_LOTE.has(f.id) ? 'Limpar a lista' : 'Trocar arquivo';
+
+  // Quem não sabe que pode soltar vários nunca vai tentar. A dica fica na
+  // própria área de soltar, no momento de escolher — não num aviso solto.
+  if (ACEITAM_LOTE.has(f.id) && !f.varios) {
+    $('dropTipos').textContent = (f.tipos || 'PDF · nada é enviado para servidores')
+      + ' · vários de uma vez no VIP';
+  }
 
   $('grade').hidden = true;
   $('tela').hidden = false;
@@ -1035,10 +1075,13 @@ function receber(arquivos) {
       : 'Escolha arquivos PDF.', true);
   }
 
-  escolhidos = atual.varios ? escolhidos.concat(bons) : [bons[0]];
+  // Em lote a lista acumula, igual às que sempre aceitaram vários. Quem não é
+  // VIP também acumula de propósito: a oferta chega com os arquivos na mão.
+  const varios = atual.varios || ACEITAM_LOTE.has(atual.id);
+  escolhidos = varios ? escolhidos.concat(bons) : [bons[0]];
   $('drop').hidden = true;
   $('trabalho').hidden = false;
-  $('maisArquivos').hidden = !atual.varios;
+  $('maisArquivos').hidden = !varios;
   $('estado').hidden = true;
   listar();
 
@@ -1171,6 +1214,46 @@ $('executar').addEventListener('click', async () => {
   dizer('Trabalhando…');
 
   try {
+    const emLote = ACEITAM_LOTE.has(atual.id) && escolhidos.length > 1;
+
+    if (emLote && !ehVip()) {
+      // A oferta chega no momento certo: os arquivos já estão escolhidos e a
+      // pessoa já sabe exatamente o trabalho que quer evitar.
+      dizer('Fazer ' + escolhidos.length + ' arquivos de uma vez é do VIP. '
+        + 'Sem ele, dá para fazer um de cada vez.', true);
+      (await paywallPronto).abrirPaywall(null, null);
+      return;
+    }
+
+    if (emLote) {
+      const saidas = [];
+      for (let i = 0; i < escolhidos.length; i++) {
+        dizer('Arquivo ' + (i + 1) + ' de ' + escolhidos.length + ' · ' + escolhidos[i].name);
+        $('barraPreenche').style.width = Math.round((i / escolhidos.length) * 100) + '%';
+
+        // Um arquivo com defeito no meio da fila não pode derrubar os outros:
+        // quem mandou cinquenta quer os quarenta e nove que deram certo.
+        try {
+          const parcial = await atual.rodar([escolhidos[i]], () => {});
+          if (parcial.unico) saidas.push(parcial.unico);
+          else if (parcial.varios) saidas.push(...parcial.varios);
+        } catch (e) {
+          saidas.push({
+            nome: PDF.semExtensao(escolhidos[i].name) + '-NAO-DEU-CERTO.txt',
+            blob: new Blob([escolhidos[i].name + ': ' + (e.message || 'erro')],
+              { type: 'text/plain;charset=utf-8' }),
+          });
+        }
+      }
+
+      await PDF.baixarVarios(saidas, 'lote-' + atual.id + '.zip');
+      $('barraPreenche').style.width = '100%';
+      const falhas = saidas.filter((x) => x.nome.includes('NAO-DEU-CERTO')).length;
+      dizer(escolhidos.length + ' arquivos processados num .zip'
+        + (falhas ? ' · ' + falhas + ' não deu certo, o motivo está num .txt junto.' : '.'));
+      return;
+    }
+
     const r = await atual.rodar(escolhidos, (fracao, feito, total) => {
       $('barraPreenche').style.width = Math.round(fracao * 100) + '%';
       dizer('Página ' + feito + ' de ' + total + '…');
@@ -1331,6 +1414,7 @@ async function montarAssinatura(arquivos) {
       <div class="pdf-previa-pe">
         <button class="btn ghost" id="asLimpar" type="button">Apagar e refazer</button>
         <button class="btn ghost" id="asImagem" type="button">Usar uma foto</button>
+        <button class="btn ghost" id="asGuardar" type="button">Guardar esta assinatura <span class="selo-vip">VIP</span></button>
         <input type="file" id="asArquivo" accept="image/*" hidden />
       </div>
     </div>
@@ -1361,7 +1445,12 @@ async function montarAssinatura(arquivos) {
     }
     if (e.target.id === 'asLimpar') limparPrancheta();
     if (e.target.id === 'asImagem') $('asArquivo').click();
+    if (e.target.closest('#asGuardar')) guardarAssinatura();
   });
+
+  // Se já houver uma assinatura guardada, ela volta desenhada: é o ponto
+  // inteiro de guardar — não redesenhar à mão a cada documento.
+  await recuperarAssinatura();
 
   $('asArquivo').addEventListener('change', async () => {
     const f = $('asArquivo').files[0];
@@ -1966,4 +2055,64 @@ async function avisarPesoDoTradutor() {
   if (await PDF.tradutorJaBaixado()) return;     // já está guardado aqui
 
   botao.textContent = 'Baixar o modelo (' + PDF.PESO_DO_TRADUTOR + ' MB) e traduzir';
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Assinatura guardada — VIP
+ * ------------------------------------------------------------------ */
+
+/**
+ * A assinatura fica no navegador, nunca no servidor.
+ *
+ * É uma assinatura: mandá-la para qualquer lugar seria exatamente o que este
+ * site promete não fazer. Guardada aqui, ela some se a pessoa limpar os dados
+ * do site — e isso é dito na tela, para ninguém contar com o que não deve.
+ */
+const CHAVE_ASSINATURA = 'editorbg:assinatura';
+
+async function guardarAssinatura() {
+  await paywallPronto;
+  if (!ehVip()) {
+    dizer('Guardar a assinatura para os próximos documentos é do VIP.', true);
+    Paywall.abrirPaywall(null, null);
+    return;
+  }
+
+  const png = await pngDaAssinatura();
+  if (!png) { dizer('Desenhe a assinatura antes de guardar.', true); return; }
+
+  try {
+    // Base64 e não blob: o armazenamento do navegador guarda texto, e uma
+    // assinatura recortada cabe em poucos kilobytes.
+    let binario = '';
+    for (const b of png) binario += String.fromCharCode(b);
+    localStorage.setItem(CHAVE_ASSINATURA, btoa(binario));
+    dizer('Assinatura guardada neste navegador. Ela aparece pronta da próxima vez.');
+  } catch {
+    dizer('Não foi possível guardar a assinatura neste navegador.', true);
+  }
+}
+
+async function recuperarAssinatura() {
+  let guardada = null;
+  try { guardada = localStorage.getItem(CHAVE_ASSINATURA); } catch { return; }
+  if (!guardada) return;
+
+  await paywallPronto;
+  if (!ehVip()) return;
+
+  try {
+    const binario = atob(guardada);
+    const bytes = new Uint8Array(binario.length);
+    for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+    imagemDaAssinatura = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    riscou = true;
+    desenharNaPrancheta();
+    await atualizarCarimbo();
+    dizer('Sua assinatura guardada foi carregada. Arraste para o lugar certo.');
+  } catch {
+    // Guardado ilegível (versão antiga, dados corrompidos): segue com a
+    // prancheta em branco em vez de deixar a ferramenta sem abrir.
+  }
 }
