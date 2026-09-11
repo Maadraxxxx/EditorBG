@@ -32,6 +32,11 @@ const ICONES = {
   numeros: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16.5h8"/><path d="M9.5 12.5v-4l-1.5 1"/><path d="M13 8.5h2.5v2H13v2h2.5"/>'),
   marca: svg('<path d="M12 2.5 4 6v6c0 4.5 3.4 8.2 8 9.5 4.6-1.3 8-5 8-9.5V6Z"/><path d="M8.5 12.5h7"/>'),
   comprimir: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="m8.5 8.5 7 7M15.5 8.5l-7 7"/>'),
+  editar: svg('<path d="M17.5 3.5 20.5 6.5 9 18l-4 1 1-4Z"/><path d="M3.5 20.5h17"/>'),
+  html: svg('<path d="m8.5 9-3.5 3 3.5 3"/><path d="m15.5 9 3.5 3-3.5 3"/><path d="m13.5 6.5-3 11"/>'),
+  ocultar: svg('<rect x="3" y="8.5" width="18" height="7" rx="1.2" fill="currentColor" stroke="none"/><path d="M4 4.5h16M4 19.5h16"/>'),
+  formulario: svg('<rect x="3.5" y="3" width="17" height="18" rx="2"/><path d="M7.5 8h9M7.5 12h9M7.5 16h5"/>'),
+  camera: svg('<path d="M3.5 8.5h3l1.5-2.5h8L17.5 8.5h3a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 18v-8a1.5 1.5 0 0 1 1.5-1.5Z"/><circle cx="12" cy="13.5" r="3.4"/>'),
   arquivo: svg('<path d="M3 7h18v12a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z"/><path d="M2 3.5h20V7H2Z"/><path d="M9.5 11h5"/>'),
   word: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8 12 1.6 5 1.9-5 1.9 5L15 12"/>'),
   excel: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8.5 12 5 5m0-5-5 5"/>'),
@@ -673,7 +678,172 @@ const FERRAMENTAS = [
       }, recado: 'Convertido para PDF/A-1b, com o perfil de cor embutido.' };
     },
   },
+  {
+    id: 'editar',
+    nome: 'Editar PDF',
+    sobre: 'Escreve textos sobre a página, sem mexer no que já estava lá.',
+    icone: 'editar',
+    aceita: 'application/pdf',
+    controles: () => `
+      <label class="ed-field">Texto a acrescentar
+        <input type="text" id="edTexto" maxlength="120" placeholder="clique na página depois de escrever" />
+      </label>
+      <label class="ed-field">Tamanho <span class="val" id="edTamanhoVal">2.5%</span>
+        <input type="range" id="edTamanho" min="10" max="60" step="1" value="25" />
+      </label>
+      <label class="cor-campo">Cor <input type="color" id="edCor" value="#111827" /></label>
+      <label class="switch small">
+        <input type="checkbox" id="edNegrito" />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text">Negrito</span>
+      </label>`,
+    preparar: montarEdicao,
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-editado.pdf',
+        blob: await PDF.editar(arquivos[0], anotacoes),
+      }, recado: anotacoes.length + (anotacoes.length === 1 ? ' texto escrito.' : ' textos escritos.') };
+    },
+  },
+  {
+    id: 'html',
+    nome: 'HTML para PDF',
+    sobre: 'Transforma código HTML colado num PDF com texto de verdade.',
+    icone: 'html',
+    aceita: null,
+    semArquivo: true,
+    aviso: 'Aceita o CÓDIGO da página, não um endereço. Para ler um site de dentro do '
+      + 'navegador, aquele site precisa autorizar a leitura por outro domínio — e quase '
+      + 'nenhum autoriza. Para uma página na internet, o "salvar como PDF" da impressão '
+      + 'do próprio navegador continua sendo o melhor caminho.',
+    controles: () => `
+      <label class="ed-field">Título (opcional)
+        <input type="text" id="htmlTitulo" maxlength="80" />
+      </label>
+      <label class="ed-field">Código HTML
+        <textarea id="htmlCodigo" rows="10" placeholder="&lt;h1&gt;Meu título&lt;/h1&gt;&#10;&lt;p&gt;Um parágrafo.&lt;/p&gt;"></textarea>
+      </label>`,
+    async rodar() {
+      return { unico: {
+        nome: (($('htmlTitulo').value || 'pagina').trim() || 'pagina') + '.pdf',
+        blob: await PDF.deHtml($('htmlCodigo').value, $('htmlTitulo').value.trim()),
+      } };
+    },
+  },
+  {
+    id: 'ocultar',
+    nome: 'Ocultar PDF',
+    sobre: 'Tarja informação sensível de forma que ela deixe de existir no arquivo.',
+    icone: 'ocultar',
+    aceita: 'application/pdf',
+    aviso: 'Desenhar um retângulo preto por cima NÃO esconde nada: o texto continua no '
+      + 'arquivo, embaixo, e qualquer um o copia — é assim que vazam documentos '
+      + '"tarjados". Aqui a página é redesenhada como imagem antes da tarja, então o que '
+      + 'ficou embaixo foi embora de verdade. Em troca, o documento deixa de ser pesquisável.',
+    controles: () => '<p class="ed-hint">Arraste sobre a página para marcar cada área. '
+      + 'Clique numa tarja para tirá-la.</p>',
+    preparar: montarOcultar,
+    async rodar(arquivos, aoProgredir) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-tarjado.pdf',
+        blob: await PDF.ocultar(arquivos[0], tarjas, aoProgredir),
+      }, recado: tarjas.length + (tarjas.length === 1 ? ' área ocultada' : ' áreas ocultadas')
+        + ' — o conteúdo por baixo não existe mais no arquivo.' };
+    },
+  },
+  {
+    id: 'formularios',
+    nome: 'Formulários PDF',
+    sobre: 'Preenche os campos de um PDF que já tem formulário.',
+    icone: 'formulario',
+    aceita: 'application/pdf',
+    controles: () => `
+      <label class="switch small">
+        <input type="checkbox" id="fmAchatar" checked />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text">Travar o preenchimento (ninguém mais altera)</span>
+      </label>
+      <p class="ed-hint small">Travado é o que se quer ao devolver um formulário pronto.
+      Desligue se o documento ainda vai passar por outra pessoa para completar.</p>`,
+    preparar: montarFormulario,
+    async rodar(arquivos) {
+      const valores = {};
+      for (const el of $('extra').querySelectorAll('[data-campo]')) {
+        valores[el.dataset.campo] = el.type === 'checkbox' ? el.checked : el.value;
+      }
+      const r = await PDF.preencherFormulario(arquivos[0], valores, $('fmAchatar').checked);
+      if (!r.mexidos) throw new Error('Nenhum campo foi preenchido.');
+      return {
+        unico: { nome: PDF.semExtensao(arquivos[0].name) + '-preenchido.pdf', blob: r.blob },
+        recado: r.mexidos + (r.mexidos === 1 ? ' campo preenchido' : ' campos preenchidos')
+          + ($('fmAchatar').checked ? ', e travado.' : '.'),
+      };
+    },
+  },
+  {
+    id: 'digitalizar',
+    nome: 'Digitalizar',
+    sobre: 'Usa a câmera como scanner e junta as fotos num PDF já corrigido.',
+    icone: 'camera',
+    aceita: 'image/*',
+    semArquivo: true,
+    controles: () => `
+      <label class="switch small">
+        <input type="checkbox" id="dgRealce" checked />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text">Corrigir contraste e nitidez</span>
+      </label>
+      <label class="switch small">
+        <input type="checkbox" id="dgCor" checked />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text">Manter as cores</span>
+      </label>
+      <p class="ed-hint small">Foto de papel tirada à mão quase nunca sai legível de
+      primeira — sombra, papel acinzentado, letra apagada. A correção é o que separa
+      um PDF que dá para ler de um borrão.</p>`,
+    preparar: montarCamera,
+    async rodar(_arquivos, aoProgredir) {
+      return { unico: {
+        nome: 'digitalizado.pdf',
+        blob: await PDF.digitalizar(capturas, {
+          realcar: $('dgRealce').checked,
+          cor: $('dgCor').checked,
+        }, aoProgredir),
+      }, recado: capturas.length + (capturas.length === 1 ? ' página' : ' páginas') + ' no PDF.' };
+    },
+  },
 ];
+
+/**
+ * A cor do ícone diz a que família a ferramenta pertence.
+ *
+ * Com 32 cartões na tela, cor é o que o olho lê antes do texto: quem procura
+ * "aquela de Excel" acha as três verdes sem ler nenhum nome. As cores do Word,
+ * Excel e PowerPoint são de propósito as dos próprios programas — é a
+ * associação que as pessoas já trazem pronta.
+ */
+const CORES = {
+  juntar: 'estrutura', dividir: 'estrutura', organizar: 'estrutura',
+  rodar: 'estrutura', recortar: 'estrutura', numeros: 'estrutura',
+
+  comprimir: 'otimizar', reparar: 'otimizar', pdfa: 'otimizar',
+
+  'para-word': 'word', 'de-word': 'word',
+  'para-excel': 'excel', 'de-excel': 'excel',
+  'para-ppt': 'ppt', 'de-ppt': 'ppt',
+
+  'para-jpg': 'imagem', 'de-jpg': 'imagem', digitalizar: 'imagem',
+
+  proteger: 'seguranca', desbloquear: 'seguranca', assinar: 'seguranca', ocultar: 'seguranca',
+
+  ocr: 'ia', resumir: 'ia', traduzir: 'ia',
+
+  markdown: 'texto', texto: 'texto', html: 'texto',
+
+  editar: 'edicao', marca: 'edicao', formularios: 'edicao',
+
+  comparar: 'comparar',
+};
 
 /**
  * A ordem dos cartões na grade.
@@ -692,11 +862,11 @@ const ORDEM = [
   'juntar', 'dividir', 'comprimir',
   'para-word', 'para-ppt', 'para-excel',
   'de-word', 'de-ppt', 'de-excel',
-  'para-jpg', 'de-jpg',
-  'assinar', 'marca', 'rodar',
+  'editar', 'para-jpg', 'de-jpg',
+  'assinar', 'marca', 'rodar', 'html',
   'desbloquear', 'proteger',
-  'organizar', 'pdfa', 'reparar', 'numeros', 'ocr',
-  'comparar', 'recortar',
+  'organizar', 'pdfa', 'reparar', 'numeros', 'digitalizar', 'ocr',
+  'comparar', 'ocultar', 'recortar', 'formularios',
   'resumir', 'traduzir',
   'markdown', 'texto',
 ];
@@ -719,7 +889,7 @@ function tamanho(bytes) {
 (function montarGrade() {
   $('pdfGrade').innerHTML = FERRAMENTAS.map((f) => `
     <button class="pdf-card" data-id="${f.id}" type="button">
-      <span class="pdf-icone">${ICONES[f.icone]}</span>
+      <span class="pdf-icone cor-${CORES[f.id] || 'estrutura'}">${ICONES[f.icone]}</span>
       <strong>${f.nome}</strong>
       <span>${f.sobre}</span>
     </button>`).join('');
@@ -739,12 +909,14 @@ let atual = null;
 let escolhidos = [];
 
 function abrir(f) {
+  desligarCamera();
   atual = f;
   escolhidos = [];
 
   $('telaNome').textContent = f.nome;
   $('telaSobre').textContent = f.sobre;
   $('telaIcone').innerHTML = ICONES[f.icone];
+  $('telaIcone').className = 'pdf-icone cor-' + (CORES[f.id] || 'estrutura');
   $('dropTitulo').textContent = f.dica || 'Arraste o arquivo aqui';
   $('dropTipos').textContent = f.tipos || 'PDF · nada é enviado para servidores';
 
@@ -761,12 +933,19 @@ function abrir(f) {
 
   $('grade').hidden = true;
   $('tela').hidden = false;
-  $('trabalho').hidden = true;
   $('maisArquivos').hidden = true;
-  $('drop').hidden = false;
+
+  // Algumas ferramentas não recebem arquivo: HTML colado e a câmera começam com
+  // a tela de trabalho aberta, senão pediriam um arquivo que não existe.
+  $('trabalho').hidden = !f.semArquivo;
+  $('drop').hidden = !!f.semArquivo;
   $('estado').hidden = true;
   $('barra').hidden = true;
   $('executar').disabled = false;
+
+  // Depois de zerar o botão, nunca antes: a montagem da câmera o desabilita até
+  // existir a primeira foto, e o reset acima desfaria isso.
+  if (f.semArquivo && f.preparar) f.preparar([]);
 
   // O endereço guarda a ferramenta aberta: voltar pelo botão do navegador
   // volta para a grade, e um link para uma ferramenta específica funciona.
@@ -775,6 +954,7 @@ function abrir(f) {
 }
 
 function fechar() {
+  desligarCamera();
   atual = null;
   escolhidos = [];
   $('tela').hidden = true;
@@ -962,7 +1142,11 @@ function dizer(texto, erro = false) {
 }
 
 $('executar').addEventListener('click', async () => {
-  if (!atual || !escolhidos.length) return;
+  if (!atual) return;
+  // HTML colado e câmera trabalham sem arquivo escolhido; as outras precisam de
+  // pelo menos um. Sem esta distinção o botão não fazia nada nessas duas, sem
+  // mensagem nenhuma — o pior tipo de defeito.
+  if (!atual.semArquivo && !escolhidos.length) return;
 
   $('executar').disabled = true;
   $('barra').hidden = false;
@@ -1410,4 +1594,340 @@ function mostrarTexto(titulo, texto) {
   $('extra').innerHTML = '<span class="aj-titulo"></span><pre class="pdf-saida"></pre>';
   $('extra').querySelector('.aj-titulo').textContent = titulo;
   $('extra').querySelector('.pdf-saida').textContent = texto;
+}
+
+/* ------------------------------------------------------------------ *
+ * Editar: escrever clicando na página
+ * ------------------------------------------------------------------ */
+let anotacoes = [];
+
+function corDoCampo(hex) {
+  const n = parseInt(String(hex || '#111827').slice(1), 16);
+  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+}
+
+async function montarEdicao(arquivos) {
+  anotacoes = [];
+  paginaDaPrevia = 1;
+
+  $('extra').hidden = false;
+  $('extra').innerHTML = `
+    <div class="pdf-previa">
+      <div class="pdf-folha pdf-folha-clicavel" id="folha"></div>
+      <div class="pdf-previa-pe">
+        <button class="btn ghost" data-ir="-1" type="button">‹</button>
+        <span id="previaConta">—</span>
+        <button class="btn ghost" data-ir="1" type="button">›</button>
+      </div>
+      <p class="ed-hint">Escreva no campo acima e clique na página para colocar o texto.
+      Clique num texto já colocado para tirá-lo.</p>
+    </div>`;
+
+  await trocarPagina(arquivos[0], 1);
+
+  $('extra').addEventListener('click', async (e) => {
+    const ir = e.target.closest('[data-ir]');
+    if (ir) { await trocarPagina(arquivos[0], paginaDaPrevia + Number(ir.dataset.ir)); desenharAnotacoes(); }
+  });
+
+  $('edTamanho').addEventListener('input', () => {
+    $('edTamanhoVal').textContent = (Number($('edTamanho').value) / 10).toFixed(1) + '%';
+  });
+
+  $('folha').addEventListener('click', (e) => {
+    // Clicar num texto já colocado tira aquele texto, em vez de empilhar outro
+    // por cima — que é o que acontece quando alguém erra o lugar.
+    const jaTem = e.target.closest('[data-anotacao]');
+    if (jaTem) {
+      anotacoes.splice(Number(jaTem.dataset.anotacao), 1);
+      desenharAnotacoes();
+      return;
+    }
+    const texto = $('edTexto').value.trim();
+    if (!texto) { dizer('Escreva o texto no campo acima antes de clicar na página.', true); return; }
+
+    const r = $('folha').getBoundingClientRect();
+    anotacoes.push({
+      pagina: paginaDaPrevia,
+      x: (e.clientX - r.left) / r.width,
+      y: (e.clientY - r.top) / r.height,
+      texto,
+      tamanho: Number($('edTamanho').value) / 1000,
+      negrito: $('edNegrito').checked,
+      cor: corDoCampo($('edCor').value),
+      corHex: $('edCor').value,
+    });
+    $('estado').hidden = true;
+    desenharAnotacoes();
+  });
+}
+
+function desenharAnotacoes() {
+  const folha = $('folha');
+  if (!folha) return;
+  for (const velho of folha.querySelectorAll('[data-anotacao]')) velho.remove();
+
+  anotacoes.forEach((a, i) => {
+    if (a.pagina !== paginaDaPrevia) return;
+    const el = document.createElement('span');
+    el.className = 'pdf-anotacao';
+    el.dataset.anotacao = i;
+    el.textContent = a.texto;
+    el.style.left = (a.x * 100) + '%';
+    el.style.top = (a.y * 100) + '%';
+    el.style.color = a.corHex;
+    el.style.fontWeight = a.negrito ? '700' : '400';
+    // O tamanho é fração da ALTURA da página, igual ao que o motor usa: assim o
+    // que se vê na prévia é do mesmo tamanho que vai sair no arquivo.
+    el.style.fontSize = (a.tamanho * folha.clientHeight) + 'px';
+    folha.append(el);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Ocultar: arrastar tarjas sobre a página
+ * ------------------------------------------------------------------ */
+let tarjas = [];
+
+async function montarOcultar(arquivos) {
+  tarjas = [];
+  paginaDaPrevia = 1;
+
+  $('extra').hidden = false;
+  $('extra').innerHTML = `
+    <div class="pdf-previa">
+      <div class="pdf-folha pdf-folha-tarja" id="folha"></div>
+      <div class="pdf-previa-pe">
+        <button class="btn ghost" data-ir="-1" type="button">‹</button>
+        <span id="previaConta">—</span>
+        <button class="btn ghost" data-ir="1" type="button">›</button>
+        <button class="btn ghost" id="tarjaLimpar" type="button">Tirar todas</button>
+      </div>
+    </div>`;
+
+  await trocarPagina(arquivos[0], 1);
+
+  $('extra').addEventListener('click', async (e) => {
+    const ir = e.target.closest('[data-ir]');
+    if (ir) { await trocarPagina(arquivos[0], paginaDaPrevia + Number(ir.dataset.ir)); desenharTarjas(); }
+    if (e.target.id === 'tarjaLimpar') { tarjas = []; desenharTarjas(); }
+  });
+
+  arrastarTarja();
+}
+
+function arrastarTarja() {
+  const folha = $('folha');
+  if (!folha) return;
+  let inicio = null;
+  let provisoria = null;
+
+  const ponto = (e) => {
+    const r = folha.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+    };
+  };
+
+  folha.addEventListener('pointerdown', (e) => {
+    const existente = e.target.closest('[data-tarja]');
+    if (existente) { tarjas.splice(Number(existente.dataset.tarja), 1); desenharTarjas(); return; }
+    e.preventDefault();
+    try { folha.setPointerCapture(e.pointerId); } catch { /* ponteiro já solto */ }
+    inicio = ponto(e);
+    provisoria = document.createElement('div');
+    provisoria.className = 'pdf-tarja provisoria';
+    folha.append(provisoria);
+  });
+
+  folha.addEventListener('pointermove', (e) => {
+    if (!inicio || !provisoria) return;
+    const p = ponto(e);
+    provisoria.style.left = (Math.min(inicio.x, p.x) * 100) + '%';
+    provisoria.style.top = (Math.min(inicio.y, p.y) * 100) + '%';
+    provisoria.style.width = (Math.abs(p.x - inicio.x) * 100) + '%';
+    provisoria.style.height = (Math.abs(p.y - inicio.y) * 100) + '%';
+  });
+
+  ['pointerup', 'pointercancel'].forEach((ev) =>
+    folha.addEventListener(ev, (e) => {
+      if (!inicio) return;
+      const p = ponto(e);
+      const larg = Math.abs(p.x - inicio.x);
+      const alt = Math.abs(p.y - inicio.y);
+      // Um clique sem arrastar não pode virar uma tarja de tamanho zero
+      // invisível que a pessoa nunca conseguiria tirar.
+      if (larg > 0.01 && alt > 0.005) {
+        tarjas.push({
+          pagina: paginaDaPrevia,
+          x: Math.min(inicio.x, p.x), y: Math.min(inicio.y, p.y),
+          w: larg, h: alt,
+        });
+      }
+      inicio = null;
+      if (provisoria) { provisoria.remove(); provisoria = null; }
+      desenharTarjas();
+    })
+  );
+}
+
+function desenharTarjas() {
+  const folha = $('folha');
+  if (!folha) return;
+  for (const velha of folha.querySelectorAll('[data-tarja]')) velha.remove();
+
+  tarjas.forEach((t, i) => {
+    if (t.pagina !== paginaDaPrevia) return;
+    const el = document.createElement('div');
+    el.className = 'pdf-tarja';
+    el.dataset.tarja = i;
+    el.title = 'Clique para tirar';
+    el.style.left = (t.x * 100) + '%';
+    el.style.top = (t.y * 100) + '%';
+    el.style.width = (t.w * 100) + '%';
+    el.style.height = (t.h * 100) + '%';
+    folha.append(el);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * Formulários
+ * ------------------------------------------------------------------ */
+async function montarFormulario(arquivos) {
+  const campos = await PDF.camposDoFormulario(arquivos[0]);
+  const uteis = campos.filter((c) => c.tipo !== 'outro');
+
+  $('extra').hidden = false;
+  if (!uteis.length) {
+    $('extra').innerHTML = '<p class="pdf-aviso">Este PDF não tem campos preenchíveis. '
+      + 'Ele provavelmente é um formulário só desenhado — nesse caso use "Editar PDF", '
+      + 'que escreve por cima da página.</p>';
+    $('executar').disabled = true;
+    return;
+  }
+
+  $('executar').disabled = false;
+  $('extra').innerHTML = '<span class="aj-titulo">' + uteis.length
+    + (uteis.length === 1 ? ' campo encontrado' : ' campos encontrados') + '</span>'
+    + '<div class="pdf-campos">' + uteis.map((c) => {
+      const rotulo = c.nome.replace(/[_.]/g, ' ');
+      if (c.tipo === 'caixa') {
+        return `<label class="switch small">
+          <input type="checkbox" data-campo="${c.nome}" ${c.valor ? 'checked' : ''} />
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-text">${rotulo}</span>
+        </label>`;
+      }
+      if (c.tipo === 'lista' || c.tipo === 'escolha') {
+        return `<label class="ed-field">${rotulo}
+          <select data-campo="${c.nome}">
+            <option value="">—</option>
+            ${(c.opcoes || []).map((o) => `<option ${o === c.valor ? 'selected' : ''}>${o}</option>`).join('')}
+          </select></label>`;
+      }
+      return `<label class="ed-field">${rotulo}
+        <input type="text" data-campo="${c.nome}" value="${String(c.valor || '').replace(/"/g, '&quot;')}" />
+      </label>`;
+    }).join('') + '</div>';
+}
+
+/* ------------------------------------------------------------------ *
+ * Digitalizar com a câmera
+ * ------------------------------------------------------------------ */
+let capturas = [];
+let camera = null;
+
+async function montarCamera() {
+  capturas = [];
+
+  $('extra').hidden = false;
+  $('extra').innerHTML = `
+    <div class="pdf-camera">
+      <video id="dgVideo" playsinline muted></video>
+      <p class="ed-hint" id="dgAviso">Ligue a câmera, enquadre a folha e fotografe cada página.</p>
+      <div class="pdf-previa-pe">
+        <button class="btn primary" id="dgLigar" type="button">Ligar a câmera</button>
+        <button class="btn ghost" id="dgTirar" type="button" hidden>Fotografar página</button>
+        <button class="btn ghost" id="dgEscolher" type="button">Escolher fotos do aparelho</button>
+        <input type="file" id="dgArquivos" accept="image/*" multiple hidden />
+      </div>
+      <div class="pdf-capturas" id="dgCapturas"></div>
+    </div>`;
+
+  $('executar').disabled = true;
+
+  $('dgLigar').addEventListener('click', ligarCamera);
+  $('dgTirar').addEventListener('click', fotografar);
+  $('dgEscolher').addEventListener('click', () => $('dgArquivos').click());
+  $('dgArquivos').addEventListener('change', () => {
+    for (const f of $('dgArquivos').files) capturas.push(f);
+    $('dgArquivos').value = '';
+    listarCapturas();
+  });
+
+  $('dgCapturas').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-captura]');
+    if (!b) return;
+    capturas.splice(Number(b.dataset.captura), 1);
+    listarCapturas();
+  });
+}
+
+async function ligarCamera() {
+  try {
+    // facingMode 'environment' pede a câmera de trás no celular, que é a que
+    // enxerga o papel na mesa; no computador o navegador ignora e usa a única.
+    camera = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1440 } },
+      audio: false,
+    });
+    $('dgVideo').srcObject = camera;
+    await $('dgVideo').play();
+    $('dgVideo').classList.add('ligada');
+    $('dgLigar').hidden = true;
+    $('dgTirar').hidden = false;
+    $('dgAviso').textContent = 'Encoste a folha numa superfície plana, com luz, e fotografe.';
+  } catch (e) {
+    $('dgAviso').textContent = e.name === 'NotAllowedError'
+      ? 'Você precisa permitir o acesso à câmera. Se recusou sem querer, permita nas '
+        + 'configurações do site e tente de novo.'
+      : 'Não consegui abrir a câmera neste aparelho (' + e.message + '). '
+        + 'Dá para escolher fotos já tiradas no botão ao lado.';
+  }
+}
+
+async function fotografar() {
+  const video = $('dgVideo');
+  const cv = document.createElement('canvas');
+  cv.width = video.videoWidth;
+  cv.height = video.videoHeight;
+  cv.getContext('2d').drawImage(video, 0, 0);
+  const blob = await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.94));
+  capturas.push(new File([blob], 'foto-' + (capturas.length + 1) + '.jpg', { type: 'image/jpeg' }));
+  listarCapturas();
+}
+
+function listarCapturas() {
+  const caixa = $('dgCapturas');
+  if (!caixa) return;
+
+  // Os endereços antigos são devolvidos antes de montar a lista nova, senão
+  // cada foto tirada deixaria uma cópia presa na memória até fechar a aba.
+  for (const img of caixa.querySelectorAll('img')) URL.revokeObjectURL(img.src);
+
+  caixa.innerHTML = capturas.map((f, i) =>
+    '<div class="pdf-captura"><img src="' + URL.createObjectURL(f) + '" alt="Página ' + (i + 1) + '" />'
+    + '<button data-captura="' + i + '" type="button" title="Tirar">✕</button>'
+    + '<span>' + (i + 1) + '</span></div>').join('');
+
+  $('executar').disabled = !capturas.length;
+  if (capturas.length) dizer(capturas.length + (capturas.length === 1 ? ' página capturada.' : ' páginas capturadas.'));
+}
+
+/** A câmera precisa ser desligada ao sair, senão a luz fica acesa. */
+function desligarCamera() {
+  if (!camera) return;
+  for (const faixa of camera.getTracks()) faixa.stop();
+  camera = null;
 }

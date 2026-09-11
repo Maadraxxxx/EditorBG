@@ -2524,3 +2524,80 @@ body[data-mode="pdf"] main { max-width: 1320px; }
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ---------- cor por família de ferramenta ---------- */
+.pdf-icone.cor-estrutura { background: linear-gradient(135deg, #818cf8, #4f46e5); box-shadow: 0 6px 16px rgba(79,70,229,.3); }
+.pdf-icone.cor-otimizar  { background: linear-gradient(135deg, #34d399, #059669); box-shadow: 0 6px 16px rgba(5,150,105,.3); }
+.pdf-icone.cor-word      { background: linear-gradient(135deg, #60a5fa, #2b579a); box-shadow: 0 6px 16px rgba(43,87,154,.32); }
+.pdf-icone.cor-excel     { background: linear-gradient(135deg, #4ade80, #217346); box-shadow: 0 6px 16px rgba(33,115,70,.32); }
+.pdf-icone.cor-ppt       { background: linear-gradient(135deg, #fb923c, #d24726); box-shadow: 0 6px 16px rgba(210,71,38,.32); }
+.pdf-icone.cor-imagem    { background: linear-gradient(135deg, #fbbf24, #d97706); box-shadow: 0 6px 16px rgba(217,119,6,.32); }
+.pdf-icone.cor-seguranca { background: linear-gradient(135deg, #22d3ee, #0e7490); box-shadow: 0 6px 16px rgba(14,116,144,.32); }
+.pdf-icone.cor-ia        { background: linear-gradient(135deg, #c084fc, #7c3aed); box-shadow: 0 6px 16px rgba(124,58,237,.32); }
+.pdf-icone.cor-texto     { background: linear-gradient(135deg, #94a3b8, #475569); box-shadow: 0 6px 16px rgba(71,85,105,.3); }
+.pdf-icone.cor-edicao    { background: linear-gradient(135deg, #fb7185, #e11d48); box-shadow: 0 6px 16px rgba(225,29,72,.3); }
+.pdf-icone.cor-comparar  { background: linear-gradient(135deg, #38bdf8, #0284c7); box-shadow: 0 6px 16px rgba(2,132,199,.3); }
+
+/* ---------- editar: textos colocados na página ---------- */
+.pdf-folha-clicavel { cursor: text; }
+.pdf-anotacao {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1;
+  cursor: pointer;
+  /* A caixa clicável precisa cobrir a letra inteira; o outline mostra onde ela
+     está sem empurrar o texto de lugar. */
+  outline: 1px dashed rgba(91, 94, 240, .55);
+  outline-offset: 2px;
+}
+.pdf-anotacao:hover { outline-color: var(--err); }
+
+/* ---------- ocultar: tarjas ---------- */
+.pdf-folha-tarja { cursor: crosshair; }
+.pdf-tarja {
+  position: absolute;
+  background: #000;
+  cursor: pointer;
+  outline: 1px solid rgba(244, 63, 94, .9);
+}
+.pdf-tarja.provisoria { background: rgba(0, 0, 0, .55); pointer-events: none; }
+
+/* ---------- formulários ---------- */
+.pdf-campos { display: grid; gap: 12px; }
+
+/* ---------- digitalizar ---------- */
+.pdf-camera { display: grid; gap: 12px; justify-items: center; }
+.pdf-camera video {
+  width: 100%; max-width: 460px;
+  border-radius: 12px;
+  background: #0b1020;
+  display: none;
+}
+.pdf-camera video.ligada { display: block; }
+
+.pdf-capturas { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.pdf-captura { position: relative; width: 84px; }
+.pdf-captura img {
+  width: 84px; height: 108px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.pdf-captura button {
+  position: absolute; top: -6px; right: -6px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: var(--err);
+  color: #fff;
+  font-size: 11px; line-height: 1;
+  cursor: pointer;
+}
+.pdf-captura span {
+  position: absolute; bottom: 4px; left: 4px;
+  background: rgba(11, 16, 32, .78);
+  color: #fff;
+  font-size: 10px; font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+}

@@ -1800,3 +1800,303 @@ export async function paraPdfA(arquivo, opcoes = {}, aoProgredir = () => {}) {
   // Sem fluxos de objeto: o PDF/A-1 exige a tabela de referências antiga.
   return comoPdf(await doc.save({ useObjectStreams: false }));
 }
+
+/* ------------------------------------------------------------------ *
+ * HTML para PDF
+ * ------------------------------------------------------------------ */
+
+/** Lê HTML e devolve os blocos que o montador de PDF entende. */
+function blocosDoHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  // Fora o conteúdo, o resto da página é ruído: script, estilo e menu virariam
+  // parágrafos de lixo no PDF.
+  for (const fora of doc.querySelectorAll('script,style,noscript,nav,header,footer,aside,svg,iframe')) {
+    fora.remove();
+  }
+  const raiz = doc.querySelector('article, main') || doc.body;
+  const blocos = [];
+
+  const titulos = { h1: 21, h2: 17, h3: 14.5, h4: 12.5, h5: 11.5, h6: 11 };
+
+  const andar = (el) => {
+    for (const filho of el.children) {
+      const tag = filho.tagName.toLowerCase();
+      const texto = (filho.textContent || '').replace(/\s+/g, ' ').trim();
+
+      if (titulos[tag]) {
+        if (texto) blocos.push({ texto, tamanho: titulos[tag], negrito: true, antes: 12, depois: 6 });
+      } else if (tag === 'ul' || tag === 'ol') {
+        [...filho.querySelectorAll(':scope > li')].forEach((li, i) => {
+          const t = (li.textContent || '').replace(/\s+/g, ' ').trim();
+          if (t) blocos.push({ texto: (tag === 'ol' ? (i + 1) + '. ' : '•  ') + t, tamanho: 11, recuo: 16, depois: 3 });
+        });
+      } else if (tag === 'table') {
+        for (const tr of filho.querySelectorAll('tr')) {
+          const celulas = [...tr.children].map((td) => (td.textContent || '').replace(/\s+/g, ' ').trim());
+          if (celulas.some(Boolean)) blocos.push({ texto: celulas.join('   |   '), tamanho: 10, depois: 2 });
+        }
+        blocos.push({ texto: '', depois: 8 });
+      } else if (tag === 'p' || tag === 'blockquote' || tag === 'pre') {
+        if (texto) blocos.push({ texto, tamanho: 11, recuo: tag === 'blockquote' ? 18 : 0, depois: 7 });
+      } else if (filho.children.length) {
+        andar(filho);   // div, section e afins: desce até achar o conteúdo
+      } else if (texto) {
+        blocos.push({ texto, tamanho: 11, depois: 6 });
+      }
+    }
+  };
+  andar(raiz);
+  return blocos;
+}
+
+/**
+ * Converte HTML em PDF.
+ *
+ * Aceita o CÓDIGO da página, colado, e não um endereço. A diferença não é
+ * capricho: para ler um site de dentro do navegador, aquele site precisa
+ * autorizar a leitura por outro domínio, e praticamente nenhum autoriza. Quem
+ * faz isso por endereço tem um servidor buscando a página — que é justamente o
+ * que este site não tem.
+ *
+ * No navegador, "salvar como PDF" pela impressão do próprio navegador continua
+ * sendo o melhor caminho para uma página na internet. Isto aqui serve para
+ * HTML que você já tem em mãos.
+ */
+export async function deHtml(html, titulo) {
+  const limpo = String(html || '').trim();
+  if (!limpo) throw new Error('Cole o código HTML no campo acima.');
+
+  const blocos = blocosDoHtml(limpo);
+  if (!blocos.length) throw new Error('Não encontrei texto neste HTML.');
+  if (titulo) blocos.unshift({ texto: titulo, tamanho: 22, negrito: true, depois: 16 });
+  return pdfDeBlocos(blocos);
+}
+
+/* ------------------------------------------------------------------ *
+ * Ocultar (tarjar)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Tarja informação sensível de forma que ela deixe de existir.
+ *
+ * ISTO É O PONTO INTEIRO DA FERRAMENTA: desenhar um retângulo preto por cima
+ * não esconde nada. O texto continua no arquivo, embaixo, e qualquer pessoa o
+ * recupera selecionando e copiando — é assim que vazam documentos "tarjados"
+ * de tribunal e de empresa.
+ *
+ * Aqui a página é redesenhada como imagem antes de a tarja ser pintada. Numa
+ * imagem não existe texto por baixo: o que ficou embaixo da tarja foi embora
+ * junto com a camada de texto, e não há o que recuperar.
+ *
+ * O preço, inevitável, é que o documento inteiro deixa de ser pesquisável.
+ */
+export async function ocultar(arquivo, tarjas, aoProgredir = () => {}) {
+  if (!tarjas || !tarjas.length) throw new Error('Marque pelo menos uma área para ocultar.');
+
+  const { PDFDocument } = await lib();
+  const paginas = await paraImagens(arquivo, { escala: 2, tipo: 'png' }, aoProgredir);
+  const doc = await PDFDocument.create();
+
+  for (let i = 0; i < paginas.length; i++) {
+    const bitmap = await createImageBitmap(paginas[i].blob);
+    const cv = document.createElement('canvas');
+    cv.width = bitmap.width;
+    cv.height = bitmap.height;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+
+    ctx.fillStyle = '#000000';
+    for (const t of tarjas) {
+      if (t.pagina !== i + 1) continue;
+      ctx.fillRect(
+        Math.round(t.x * cv.width), Math.round(t.y * cv.height),
+        Math.round(t.w * cv.width), Math.round(t.h * cv.height),
+      );
+    }
+
+    const jpg = await new Promise((r) => cv.toBlob(r, 'image/jpeg', 0.92));
+    const imagem = await doc.embedJpg(await jpg.arrayBuffer());
+    const p = doc.addPage([imagem.width / 2, imagem.height / 2]);
+    p.drawImage(imagem, { x: 0, y: 0, width: imagem.width / 2, height: imagem.height / 2 });
+  }
+  return comoPdf(await doc.save());
+}
+
+/* ------------------------------------------------------------------ *
+ * Editar: escrever sobre a página
+ * ------------------------------------------------------------------ */
+
+/**
+ * Escreve textos novos sobre o PDF, sem tocar no que já estava lá.
+ *
+ * Posição e tamanho vêm em fração da página, como no recorte e na assinatura:
+ * a tela trabalha em porcentagem, e a mesma anotação vale para páginas de
+ * tamanhos diferentes no mesmo documento.
+ */
+export async function editar(arquivo, itens) {
+  if (!itens || !itens.length) throw new Error('Clique na página para escrever alguma coisa.');
+
+  const { StandardFonts, rgb } = await lib();
+  const doc = await abrir(arquivo);
+  const normal = await doc.embedFont(StandardFonts.Helvetica);
+  const forte = await doc.embedFont(StandardFonts.HelveticaBold);
+  const total = doc.getPageCount();
+
+  for (const item of itens) {
+    const n = Math.min(Math.max(1, item.pagina || 1), total);
+    const p = doc.getPage(n - 1);
+    const { width, height } = p.getSize();
+    const fonte = item.negrito ? forte : normal;
+    const corpo = Math.max(6, (item.tamanho || 0.025) * height);
+    const cor = item.cor || { r: 0.05, g: 0.06, b: 0.09 };
+
+    p.drawText(limparTexto(item.texto), {
+      x: width * item.x,
+      // A fração vem do topo, como na tela; o PDF conta a partir do rodapé.
+      y: height * (1 - item.y) - corpo,
+      size: corpo,
+      font: fonte,
+      color: rgb(cor.r, cor.g, cor.b),
+    });
+  }
+  return comoPdf(await doc.save());
+}
+
+/* ------------------------------------------------------------------ *
+ * Formulários
+ * ------------------------------------------------------------------ */
+
+/** Lê os campos preenchíveis do PDF, para a tela montar um formulário igual. */
+/**
+ * Que tipo de campo é este.
+ *
+ * A checagem é pelos MÉTODOS que o campo tem, e não pelo nome da classe. O
+ * pacote do pdf-lib vem minificado: lá dentro `PDFTextField` virou uma letra
+ * solta, e `campo.constructor.name` devolve essa letra. Foi assim que todos os
+ * campos apareceram como "outro" e o preenchimento não fez nada — sem erro
+ * nenhum, porque tecnicamente rodou.
+ */
+function tipoDoCampo(campo) {
+  if (typeof campo.setText === 'function') return 'texto';
+  if (typeof campo.isChecked === 'function') return 'caixa';
+  if (typeof campo.getOptions === 'function') {
+    // Lista e escolha se distinguem pelo que getSelected devolve: a lista
+    // devolve um array, o grupo de opções devolve um valor só.
+    try {
+      return Array.isArray(campo.getSelected()) ? 'lista' : 'escolha';
+    } catch {
+      return 'lista';
+    }
+  }
+  return 'outro';
+}
+
+export async function camposDoFormulario(arquivo) {
+  const doc = await abrir(arquivo);
+  const form = doc.getForm();
+
+  return form.getFields().map((campo) => {
+    const nome = campo.getName();
+    const tipo = tipoDoCampo(campo);
+
+    try {
+      if (tipo === 'texto') return { nome, tipo, valor: campo.getText() || '' };
+      if (tipo === 'caixa') return { nome, tipo, valor: campo.isChecked() };
+      if (tipo === 'lista') {
+        return { nome, tipo, opcoes: campo.getOptions(), valor: (campo.getSelected() || [])[0] || '' };
+      }
+      if (tipo === 'escolha') {
+        return { nome, tipo, opcoes: campo.getOptions(), valor: campo.getSelected() || '' };
+      }
+    } catch {
+      // Campo declarado mas sem valor legível: entra como texto vazio em vez de
+      // desaparecer do formulário.
+      return { nome, tipo: tipo === 'outro' ? 'outro' : 'texto', valor: '' };
+    }
+    return { nome, tipo: 'outro' };
+  });
+}
+
+/**
+ * Preenche e, se pedirem, achata.
+ *
+ * Achatar transforma o preenchimento em parte do desenho da página: ninguém
+ * consegue mais apagar nem alterar o que foi escrito. É o que se quer ao
+ * devolver um formulário assinado; é o que NÃO se quer se o documento ainda vai
+ * passar por outra pessoa para completar.
+ */
+export async function preencherFormulario(arquivo, valores, achatar) {
+  const doc = await abrir(arquivo);
+  const form = doc.getForm();
+  let mexidos = 0;
+
+  for (const campo of form.getFields()) {
+    const nome = campo.getName();
+    if (!(nome in valores)) continue;
+    const valor = valores[nome];
+    const tipo = tipoDoCampo(campo);
+
+    try {
+      if (tipo === 'texto') campo.setText(String(valor));
+      else if (tipo === 'caixa') { if (valor) campo.check(); else campo.uncheck(); }
+      else if (tipo === 'lista' || tipo === 'escolha') { if (valor) campo.select(String(valor)); }
+      else continue;
+      mexidos++;
+    } catch {
+      // Campo com restrição que o valor não atende. Segue para os outros em vez
+      // de derrubar o preenchimento inteiro por causa de um.
+    }
+  }
+
+  if (achatar) form.flatten();
+  return { blob: comoPdf(await doc.save()), mexidos };
+}
+
+/* ------------------------------------------------------------------ *
+ * Digitalizar
+ * ------------------------------------------------------------------ */
+
+/**
+ * Fotos de documento viram um PDF, com o contraste corrigido.
+ *
+ * Foto de papel tirada à mão quase nunca sai legível de primeira: sombra da
+ * própria mão, papel acinzentado, letra apagada. O ajuste de níveis e de
+ * nitidez é o que separa um PDF que dá para ler de um borrão — e é o mesmo
+ * motor da ferramenta de melhorar qualidade, então não há código novo para
+ * manter aqui.
+ */
+export async function digitalizar(imagens, opcoes = {}, aoProgredir = () => {}) {
+  if (!imagens || !imagens.length) throw new Error('Tire pelo menos uma foto.');
+
+  const M = await import('./melhorar.js');
+  const prontas = [];
+
+  for (let i = 0; i < imagens.length; i++) {
+    const bitmap = await createImageBitmap(imagens[i]);
+
+    const canvas = opcoes.realcar === false
+      ? bitmap
+      : M.rapido(bitmap, {
+        niveis: true,
+        ruido: 0.35,
+        nitidez: 55,
+        vibracao: opcoes.cor === false ? -100 : 0,   // documento em preto e branco
+      });
+
+    const blob = await new Promise((r) => {
+      const cv = canvas.getContext ? canvas : (() => {
+        const c = document.createElement('canvas');
+        c.width = canvas.width; c.height = canvas.height;
+        c.getContext('2d').drawImage(canvas, 0, 0);
+        return c;
+      })();
+      cv.toBlob(r, 'image/jpeg', 0.9);
+    });
+
+    prontas.push(new File([blob], 'pagina-' + (i + 1) + '.jpg', { type: 'image/jpeg' }));
+    aoProgredir((i + 1) / imagens.length, i + 1, imagens.length);
+  }
+
+  return deImagens(prontas, { margem: 0 });
+}
