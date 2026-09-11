@@ -675,6 +675,38 @@ const FERRAMENTAS = [
   },
 ];
 
+/**
+ * A ordem dos cartões na grade.
+ *
+ * É a mesma sequência das ferramentas de PDF mais conhecidas, e isso não é
+ * imitação à toa: quem já usou uma delas procura cada coisa onde estava lá, e
+ * uma ordem inventada obrigaria a pessoa a ler os 27 cartões para achar o que
+ * já sabia fazer.
+ *
+ * A ordem fica AQUI, numa lista de nomes, e não na ordem em que as ferramentas
+ * foram escritas: assim dá para mudar a grade sem mexer no código de nenhuma
+ * delas, e uma ferramenta nova não some por ter sido escrita no lugar errado —
+ * o que não estiver nesta lista vai para o fim, visível.
+ */
+const ORDEM = [
+  'juntar', 'dividir', 'comprimir',
+  'para-word', 'para-ppt', 'para-excel',
+  'de-word', 'de-ppt', 'de-excel',
+  'para-jpg', 'de-jpg',
+  'assinar', 'marca', 'rodar',
+  'desbloquear', 'proteger',
+  'organizar', 'pdfa', 'reparar', 'numeros', 'ocr',
+  'comparar', 'recortar',
+  'resumir', 'traduzir',
+  'markdown', 'texto',
+];
+
+FERRAMENTAS.sort((a, b) => {
+  const ia = ORDEM.indexOf(a.id);
+  const ib = ORDEM.indexOf(b.id);
+  return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+});
+
 function tamanho(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
