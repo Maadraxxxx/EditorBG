@@ -2283,3 +2283,103 @@ body[data-mode="melhorar"] main { max-width: 1560px; }
   border-color: transparent;
   color: #fff;
 }
+
+/* ------------------------------------------------------------------ *
+ * Página de PDF
+ * ------------------------------------------------------------------ */
+body[data-mode="pdf"] main { max-width: 1320px; }
+
+.pdf-titulo { text-align: center; margin: clamp(18px, 4vh, 40px) 0 26px; }
+.pdf-titulo h2 { margin: 0 0 8px; font-size: clamp(21px, 3vw, 29px); letter-spacing: -.4px; }
+.pdf-titulo p { margin: 0; color: var(--muted); font-size: 14px; }
+
+/* 250 e auto-fit: a grade se acomoda de uma coluna no celular até cinco no
+   monitor largo, sem media query para cada faixa. */
+.pdf-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.pdf-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  text-align: left;
+  padding: 18px 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit; color: inherit;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+}
+.pdf-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-forte);
+  box-shadow: 0 10px 26px rgba(20, 26, 39, .09);
+}
+.pdf-card strong { font-size: 14.5px; font-weight: 600; }
+.pdf-card > span:last-child { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+.pdf-icone {
+  display: grid; place-items: center;
+  width: 40px; height: 40px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  box-shadow: 0 6px 16px rgba(91, 94, 240, .3);
+}
+
+.pdf-rodape { text-align: center; margin: 22px 0 0; font-size: 12.5px; color: var(--muted-2); }
+
+/* ---------- ferramenta aberta ---------- */
+.pdf-tela { max-width: 620px; margin: 18px auto 0; }
+.pdf-cabeca { display: flex; align-items: center; gap: 14px; margin: 16px 0 20px; }
+.pdf-cabeca h2 { margin: 0 0 3px; font-size: 20px; letter-spacing: -.3px; }
+.pdf-cabeca p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.pdf-trabalho { display: grid; gap: 16px; }
+
+.pdf-arquivos { display: grid; gap: 8px; }
+.pdf-arquivo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: var(--campo);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.pdf-arquivo[draggable="true"] { cursor: grab; }
+.pdf-arquivo.arrastando { opacity: .45; }
+.pdf-arquivo-nome { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-arquivo-peso { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.pdf-tirar {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--muted); font-size: 14px; line-height: 1;
+  padding: 4px 6px; border-radius: 8px;
+}
+.pdf-tirar:hover { color: var(--err); background: var(--realce-2); }
+
+.pdf-opcoes {
+  display: grid; gap: 12px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.pdf-opcoes:empty { display: none; }
+
+.pdf-aviso {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 12.5px; line-height: 1.55;
+  color: var(--vip);
+  background: rgba(180, 83, 9, .08);
+  border: 1px solid rgba(180, 83, 9, .22);
+}
+
+.pdf-acoes { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.pdf-acoes .btn { justify-content: center; }
+.pdf-erro { color: var(--err); }
+.home-icon-pdf { background: linear-gradient(135deg, #dc2743, #b91c1c); box-shadow: 0 8px 22px rgba(220, 39, 67, .3); }
