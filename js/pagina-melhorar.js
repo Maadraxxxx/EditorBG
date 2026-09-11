@@ -203,6 +203,44 @@ function prepararIA() {
   nota.className = segundos > 120 ? 'mq-nota mq-demora' : 'mq-nota';
 }
 
+/**
+ * Confirmação de espera longa, na cara do site.
+ *
+ * Era um `confirm()` do navegador — aquela caixa cinza colada na barra de
+ * endereço, com a cara do sistema operacional. Para uma decisão de "esperar
+ * sete minutos ou não", ela some rápido demais e explica de menos.
+ */
+function confirmarDemora(segundos) {
+  const modal = $('modalDemora');
+
+  $('dmTempo').textContent = M.tempoEscrito(segundos);
+  $('dmMedidas').textContent =
+    original.width + '×' + original.height + ' vira '
+    + (original.width * 2) + '×' + (original.height * 2) + ' pixels.';
+  modal.hidden = false;
+
+  return new Promise((resolver) => {
+    function fechar(resposta) {
+      modal.hidden = true;
+      $('dmComecar').removeEventListener('click', sim);
+      $('dmCancelar').removeEventListener('click', nao);
+      modal.removeEventListener('click', fora);
+      document.removeEventListener('keydown', tecla);
+      resolver(resposta);
+    }
+    const sim = () => fechar(true);
+    const nao = () => fechar(false);
+    const fora = (e) => { if (e.target === modal) fechar(false); };
+    const tecla = (e) => { if (e.key === 'Escape') fechar(false); };
+
+    $('dmComecar').addEventListener('click', sim);
+    $('dmCancelar').addEventListener('click', nao);
+    modal.addEventListener('click', fora);
+    document.addEventListener('keydown', tecla);
+    $('dmComecar').focus();
+  });
+}
+
 let cancelar = false;
 
 $('botaoIA').addEventListener('click', async () => {
@@ -213,14 +251,7 @@ $('botaoIA').addEventListener('click', async () => {
 
   // Espera longa merece confirmação. Começar sem avisar e a pessoa descobrir
   // dez minutos depois é o pior desfecho possível aqui.
-  if (segundos > 120) {
-    const ok = confirm(
-      'Esta imagem vai levar ' + M.tempoEscrito(segundos) + ' para dobrar.\n\n'
-      + 'O processamento acontece no seu computador e a aba precisa ficar aberta '
-      + 'o tempo todo. Você pode cancelar no meio.\n\nComeçar?'
-    );
-    if (!ok) return;
-  }
+  if (segundos > 120 && !(await confirmarDemora(segundos))) return;
 
   cancelar = false;
   botao.disabled = true;

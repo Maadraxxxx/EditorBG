@@ -114,9 +114,49 @@
         </button>
         <button class="btn primary" id="baixar">Baixar grátis</button>
       </div>
-      <button class="link-botao" id="trocar">Trocar imagem</button>
+
+      <button class="btn ghost full" id="trocar">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3.5 8.5h13a4 4 0 0 1 0 8h-1"/><path d="m6.5 5.5-3 3 3 3"/>
+          <path d="M20.5 15.5h-13a4 4 0 0 1 0-8h1"/><path d="m17.5 18.5 3-3-3-3"/>
+        </svg>
+        Trocar imagem
+      </button>
     </aside>
   </section>
+
+  <!-- ================================================================
+       Confirmação de espera longa.
+       Era um confirm() do navegador, que aparece colado na barra de
+       endereço, com a cara do sistema e sem relação nenhuma com o site.
+       Uma espera de minutos merece uma tela que explique o que vai
+       acontecer, não uma caixinha cinza.
+       ================================================================ -->
+  <div class="modal" id="modalDemora" hidden>
+    <div class="hd-card mq-confirma">
+      <div class="mq-relogio" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="13" r="8.5"/><path d="M12 8.5V13l3 2"/><path d="M9 2.5h6"/>
+        </svg>
+      </div>
+
+      <h2>Isto vai levar <span id="dmTempo">—</span></h2>
+      <p class="hd-sub" id="dmMedidas">—</p>
+
+      <ul class="mq-pontos">
+        <li>O processamento acontece <strong>no seu computador</strong>, não num servidor nosso — é por isso que demora, e é por isso que a sua imagem não vai para lugar nenhum.</li>
+        <li>A aba precisa <strong>ficar aberta</strong> o tempo todo.</li>
+        <li>Dá para <strong>cancelar no meio</strong>; a imagem continua como está.</li>
+      </ul>
+
+      <div class="mq-confirma-acoes">
+        <button class="btn ghost" id="dmCancelar">Agora não</button>
+        <button class="btn primary" id="dmComecar">Começar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ------------------------------------------------------------ -->
   <section class="conteudo">

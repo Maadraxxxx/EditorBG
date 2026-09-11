@@ -11,11 +11,10 @@
  *                navegador. Inventa detalhe plausível, e é por isso que é
  *                melhor — e por isso que demora.
  *
- * SOBRE O LIMITE DE TAMANHO DA IA, que não é capricho: o modelo leva cerca de
+ * A IA aceita qualquer tamanho. Ela processa em ladrilhos, num Worker, e o
+ * tempo estimado aparece escrito antes de começar — o modelo leva cerca de
  * 0,32 ms por pixel de entrada, medido aqui em dois tamanhos com escala linear
- * confirmada. Uma foto de 1000×1000 levaria cinco minutos e meio; uma de
- * 1500×1500, doze. Por isso a IA só é oferecida abaixo de TETO_IA — acima
- * disso a espera deixaria de ser espera e viraria abandono.
+ * confirmada.
  */
 import { aplicarAjustes } from './adjust.js';
 
@@ -290,45 +289,78 @@ export function rapido(fonte, opcoes = {}) {
 /* ------------------------------------------------------------------ *
  * Caminho com IA
  * ------------------------------------------------------------------ */
-const MODELO_IA = 'Xenova/swin2SR-lightweight-x2-64';
+/**
+ * O modelo roda num Worker, nunca aqui.
+ *
+ * A inferência é CPU síncrona e leva segundos por ladrilho. Na thread da
+ * página isso congela tudo: rolagem, clique, e a própria barra de progresso,
+ * que nem chega a ser redesenhada. Ceder o controle ENTRE os ladrilhos não
+ * adianta — o congelamento acontece durante cada um.
+ */
+let trabalhador = null;
+let proximoId = 1;
+const pendentes = new Map();
+let aoBaixar = null;
+
+function obterTrabalhador() {
+  if (trabalhador) return trabalhador;
+
+  trabalhador = new Worker(new URL('./melhorar-worker.js', import.meta.url), { type: 'module' });
+
+  trabalhador.onmessage = (e) => {
+    const m = e.data || {};
+
+    if (m.tipo === 'baixando') { if (aoBaixar) aoBaixar(m.fracao); return; }
+
+    const espera = pendentes.get(m.tipo === 'carregado' ? 'carregar' : m.id);
+    if (!espera) return;
+    pendentes.delete(m.tipo === 'carregado' ? 'carregar' : m.id);
+
+    if (m.tipo === 'erro') espera.rejeitar(new Error(m.mensagem));
+    else espera.resolver(m);
+  };
+
+  trabalhador.onerror = (e) => {
+    for (const { rejeitar } of pendentes.values()) {
+      rejeitar(new Error('Falha no processador de imagem: ' + (e.message || 'erro desconhecido')));
+    }
+    pendentes.clear();
+    // Worker quebrado não pode ficar guardado: a próxima tentativa recria.
+    trabalhador = null;
+  };
+
+  return trabalhador;
+}
+
+function pedirAoTrabalhador(mensagem, chave, transferiveis) {
+  return new Promise((resolver, rejeitar) => {
+    pendentes.set(chave, { resolver, rejeitar });
+    obterTrabalhador().postMessage(mensagem, transferiveis || []);
+  });
+}
 
 let carregando = null;
 
-/** Carrega o modelo uma vez. O download é grande; o navegador guarda depois. */
-function carregarIA(aoProgredir) {
+function carregarIA(aoProgredirDownload) {
+  aoBaixar = aoProgredirDownload;
   if (carregando) return carregando;
 
-  carregando = (async () => {
-    const { pipeline, env } = await import(
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1'
-    );
-    env.allowLocalModels = false;
-    return pipeline('image-to-image', MODELO_IA, {
-      dtype: 'q8',
-      progress_callback: aoProgredir,
-    });
-  })();
-
+  carregando = pedirAoTrabalhador({ tipo: 'carregar' }, 'carregar');
   carregando.catch(() => { carregando = null; });   // erro não pode ficar em cache
   return carregando;
 }
 
+
+
 /**
- * Super-resolução 2×. Devolve um canvas novo.
+ * Super-resolução 2×, em ladrilhos, com o modelo rodando no Worker.
  *
- * @param {(fase: string, fracao: number) => void} aoProgredir  0 a 1
+ * @param {(fase: string, fracao: number, info?: {feitos: number, total: number}) => void} aoProgredir
+ * @param {() => boolean} deveParar  consultado entre ladrilhos
  */
 export async function comIA(fonte, aoProgredir = () => {}, deveParar = () => false) {
   aoProgredir('baixando', 0);
-  const modelo = await carregarIA((p) => {
-    if (p && p.status === 'progress' && p.total) {
-      aoProgredir('baixando', Math.min(0.99, p.loaded / p.total));
-    }
-  });
-
-  const { RawImage } = await import(
-    'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1'
-  );
+  await carregarIA((fracao) => aoProgredir('baixando', Math.min(0.99, fracao)));
 
   const entrada = paraCanvas(fonte);
   const saida = document.createElement('canvas');
@@ -347,7 +379,7 @@ export async function comIA(fonte, aoProgredir = () => {}, deveParar = () => fal
     for (let lx = 0; lx < colunas; lx++) {
       if (deveParar()) throw new Error('cancelado');
 
-      // Miolo que este ladrilho é responsável por preencher.
+      // Miolo que este ladrilho preenche.
       const mx = lx * LADRILHO;
       const my = ly * LADRILHO;
       const mw = Math.min(LADRILHO, entrada.width - mx);
@@ -365,18 +397,19 @@ export async function comIA(fonte, aoProgredir = () => {}, deveParar = () => fal
       pedaco.getContext('2d').drawImage(entrada, rx, ry, rw, rh, 0, 0, rw, rh);
 
       const blob = await new Promise((r) => pedaco.toBlob(r, 'image/png'));
-      const dobrado = await modelo(await RawImage.fromBlob(blob));
+
+      const id = proximoId++;
+      const pronto = await pedirAoTrabalhador({ tipo: 'ladrilho', id, blob }, id);
 
       const cv = document.createElement('canvas');
-      cv.width = dobrado.width;
-      cv.height = dobrado.height;
+      cv.width = pronto.largura;
+      cv.height = pronto.altura;
       cv.getContext('2d').putImageData(
-        new ImageData(new Uint8ClampedArray(paraRGBA(dobrado)), dobrado.width, dobrado.height),
-        0, 0
+        new ImageData(pronto.dados, pronto.largura, pronto.altura), 0, 0
       );
 
-      // Descarta a margem e cola só o miolo: a margem existiu para dar
-      // contexto ao modelo, não para aparecer no resultado.
+      // Descarta a margem e cola só o miolo: a margem existiu para dar contexto
+      // ao modelo, não para aparecer no resultado.
       ctxSaida.drawImage(
         cv,
         (mx - rx) * 2, (my - ry) * 2, mw * 2, mh * 2,
@@ -385,27 +418,9 @@ export async function comIA(fonte, aoProgredir = () => {}, deveParar = () => fal
 
       feitos++;
       aoProgredir('processando', feitos / total, { feitos, total });
-
-      // Devolve o controle ao navegador entre ladrilhos: sem isto a aba
-      // congela e o progresso na tela nunca chega a ser desenhado.
-      await new Promise((r) => setTimeout(r, 0));
     }
   }
 
   aoProgredir('pronto', 1, { feitos, total });
   return saida;
-}
-
-/** O modelo devolve 3 canais; o canvas quer 4. */
-function paraRGBA(img) {
-  if (img.channels === 4) return img.data;
-  const n = img.width * img.height;
-  const fora = new Uint8ClampedArray(n * 4);
-  for (let i = 0; i < n; i++) {
-    fora[i * 4] = img.data[i * img.channels];
-    fora[i * 4 + 1] = img.data[i * img.channels + 1];
-    fora[i * 4 + 2] = img.data[i * img.channels + 2];
-    fora[i * 4 + 3] = 255;
-  }
-  return fora;
 }
