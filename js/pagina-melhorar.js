@@ -116,6 +116,8 @@ async function aplicar() {
     niveis: $('niveis').checked,
     ruido: Number($('ruido').value) / 100,
     nitidez: Number($('nitidez').value),
+    vibracao: M.PERFIS[perfil].opcoes.vibracao,
+    equilibrio: $('equilibrio').checked && temVip() ? 1 : 0,
   });
 
   mostrar(atual);
@@ -133,6 +135,66 @@ for (const id of ['nitidez', 'ruido']) {
   });
 }
 $('niveis').addEventListener('change', aplicarDepois);
+
+/* ------------------------------------------------------------------ *
+ * Perfis por tipo de foto
+ * ------------------------------------------------------------------ */
+let perfil = 'auto';
+
+(function montarPerfis() {
+  const caixa = $('perfis');
+  for (const [id, p] of Object.entries(M.PERFIS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mq-perfil' + (id === perfil ? ' is-active' : '');
+    b.dataset.perfil = id;
+    b.textContent = p.nome;
+    caixa.append(b);
+  }
+  $('perfilDica').textContent = M.PERFIS[perfil].dica;
+
+  caixa.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-perfil]');
+    if (!b) return;
+    perfil = b.dataset.perfil;
+    for (const outro of caixa.children) outro.classList.toggle('is-active', outro === b);
+
+    // O perfil move os sliders, não os substitui: quem quiser conferir ou
+    // ajustar depois vê exatamente onde cada um parou.
+    const o = M.PERFIS[perfil].opcoes;
+    $('nitidez').value = o.nitidez;  $('vNitidez').textContent = o.nitidez;
+    $('ruido').value = Math.round(o.ruido * 100); $('vRuido').textContent = $('ruido').value;
+    $('niveis').checked = o.niveis;
+    $('perfilDica').textContent = M.PERFIS[perfil].dica;
+    refreshSliders();
+    aplicarDepois();
+  });
+})();
+
+/* ------------------------------------------------------------------ *
+ * Equilíbrio de cor — VIP
+ * ------------------------------------------------------------------ */
+$('equilibrio').addEventListener('change', () => {
+  if ($('equilibrio').checked && !temVip()) {
+    // Desmarca e explica, em vez de deixar um controle morto na tela.
+    $('equilibrio').checked = false;
+    import('./paywall.js').then((P) => P.abrirPaywall(null, null));
+    return;
+  }
+  aplicarDepois();
+});
+
+function temVip() {
+  return Conta.ehVip();
+}
+
+// Perder o plano desliga o recurso em vez de deixá-lo de graça.
+Conta.aoMudar(() => {
+  if (!temVip() && $('equilibrio').checked) {
+    $('equilibrio').checked = false;
+    aplicarDepois();
+  }
+});
 
 /* ------------------------------------------------------------------ *
  * Cota diária

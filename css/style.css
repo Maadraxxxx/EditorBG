@@ -2176,3 +2176,24 @@ body[data-mode="editor"] .conteudo {
   flex: 1 1 120px;
   min-width: 0;
 }
+
+/* ---- perfis por tipo de foto ---- */
+.mq-perfis { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.mq-perfil {
+  background: var(--campo);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s, transform .14s;
+}
+.mq-perfil:hover { color: var(--txt); border-color: var(--line-forte); transform: translateY(-1px); }
+.mq-perfil:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.mq-perfil.is-active {
+  background: linear-gradient(180deg, var(--accent), #4f46e5);
+  border-color: transparent;
+  color: #fff;
+}

@@ -202,12 +202,112 @@ function ampliar(fonte, escala) {
   return atual;
 }
 
+/* ------------------------------------------------------------------ *
+ * Perfis por tipo de foto
+ * ------------------------------------------------------------------ *
+ * Os mesmos controles, em posições diferentes. Existem porque "o que melhora"
+ * muda com o assunto: pele pede menos nitidez do que etiqueta de produto, e
+ * documento pede contraste duro que arruinaria um retrato.
+ *
+ * Não é recurso novo escondido — é o atalho para quem não quer aprender o que
+ * cada controle faz. Os sliders continuam ali para quem quiser.
+ */
+export const PERFIS = {
+  auto: {
+    nome: 'Automático',
+    dica: 'Equilibrado. Serve para a maioria das fotos.',
+    opcoes: { niveis: true, ruido: 0.75, nitidez: 42, vibracao: 12 },
+  },
+  retrato: {
+    nome: 'Retrato',
+    dica: 'Menos nitidez e mais suavização: pele afiada demais mostra poro e mancha.',
+    opcoes: { niveis: true, ruido: 0.9, nitidez: 22, vibracao: 8 },
+  },
+  produto: {
+    nome: 'Produto',
+    dica: 'Nitidez alta e cor puxada, para etiqueta legível e tecido com textura.',
+    opcoes: { niveis: true, ruido: 0.5, nitidez: 68, vibracao: 22 },
+  },
+  paisagem: {
+    nome: 'Paisagem',
+    dica: 'Contraste e cor firmes, sem exagerar no grão do céu.',
+    opcoes: { niveis: true, ruido: 0.65, nitidez: 50, vibracao: 26 },
+  },
+  documento: {
+    nome: 'Documento',
+    dica: 'Contraste duro e nitidez máxima: o que importa é a letra, não a foto.',
+    opcoes: { niveis: true, ruido: 0.35, nitidez: 85, vibracao: 0 },
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Equilíbrio de cor automático
+ * ------------------------------------------------------------------ */
+
+/**
+ * Tira a dominante de cor da foto.
+ *
+ * Foto tirada sob lâmpada amarela fica amarela inteira; sob sombra de céu
+ * aberto, azulada. O olho compensa na hora e a câmera nem sempre.
+ *
+ * O método é o "mundo cinza": numa cena variada, a média de todas as cores
+ * deveria dar cinza. Se a média está puxada para o amarelo, é a luz, não a
+ * cena — então cada canal é multiplicado até a média voltar ao neutro.
+ *
+ * O ganho é limitado de propósito. Foto que É de uma coisa laranja tem média
+ * laranja legitimamente, e sem teto o filtro a deixaria azulada tentando
+ * "consertar" o que não estava quebrado.
+ */
+export function equilibrarCor(canvas, forca = 1) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+
+  let somaR = 0, somaG = 0, somaB = 0, n = 0;
+  // Amostra espaçada: a média não muda e a conta fica instantânea em foto grande.
+  const passo = Math.max(4, Math.floor(d.length / 4 / 40000)) * 4;
+  for (let i = 0; i < d.length; i += passo) {
+    // Pixel quase preto ou quase branco não informa sobre a cor da luz.
+    const lum = d[i] * 0.2126 + d[i + 1] * 0.7152 + d[i + 2] * 0.0722;
+    if (lum < 24 || lum > 242) continue;
+    somaR += d[i]; somaG += d[i + 1]; somaB += d[i + 2]; n++;
+  }
+  if (n < 50) return 0;
+
+  const mR = somaR / n, mG = somaG / n, mB = somaB / n;
+  const cinza = (mR + mG + mB) / 3;
+
+  const limitar = (g) => Math.min(1.35, Math.max(0.74, g));
+  let gR = limitar(cinza / mR);
+  let gG = limitar(cinza / mG);
+  let gB = limitar(cinza / mB);
+
+  // `forca` permite aplicar só parte da correção.
+  gR = 1 + (gR - 1) * forca;
+  gG = 1 + (gG - 1) * forca;
+  gB = 1 + (gB - 1) * forca;
+
+  const tR = new Uint8ClampedArray(256);
+  const tG = new Uint8ClampedArray(256);
+  const tB = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) { tR[v] = v * gR; tG[v] = v * gG; tB[v] = v * gB; }
+
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = tR[d[i]]; d[i + 1] = tG[d[i + 1]]; d[i + 2] = tB[d[i + 2]];
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // Quanto a foto estava desviada, para a tela poder dizer se valeu a pena.
+  return Math.round(Math.max(Math.abs(gR - 1), Math.abs(gG - 1), Math.abs(gB - 1)) * 100);
+}
+
 export const OPCOES_PADRAO = {
   niveis: true,
   ruido: 0.75,        // 0 a 1
   nitidez: 42,        // escala de adjust.js, 0 a 100
   vibracao: 12,
   escala: 1,          // 1 = não amplia
+  equilibrio: 0,      // 0 a 1 — correção de dominante de cor, recurso VIP
 };
 
 /**
@@ -228,6 +328,10 @@ export function rapido(fonte, opcoes = {}) {
   // ruído junto com tudo. Um grão que valia 13 passava a valer 57, cruzava o
   // limiar que separa ruído de detalhe, e a redução seguinte simplesmente o
   // deixava passar — para a nitidez então reforçá-lo.
+  // Equilíbrio ANTES de tudo: a dominante de cor é da luz da cena, e corrigir
+  // depois de esticar contraste significaria corrigir um desvio já ampliado.
+  if (o.equilibrio > 0) equilibrarCor(canvas, o.equilibrio);
+
   const sigma = reduzirRuido(ctx, canvas.width, canvas.height, o.ruido);
 
   let ganho = 1;
