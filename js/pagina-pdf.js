@@ -60,8 +60,8 @@ const FERRAMENTAS = [
     aceita: 'application/pdf',
     varios: true,
     dica: 'Arraste os PDFs aqui',
-    tipos: 'PDF · pode escolher vários de uma vez',
-    controles: () => '<p class="ed-hint">Arraste os nomes abaixo para mudar a ordem.</p>',
+    tipos: 'PDF · segure Ctrl para escolher vários de uma vez',
+    controles: () => '<p class="ed-hint">Os PDFs entram na ordem da lista — arraste os nomes para mudar.</p>',
     async rodar(arquivos) {
       if (arquivos.length < 2) throw new Error('Escolha pelo menos dois PDFs para juntar.');
       return { unico: { nome: 'juntado.pdf', blob: await PDF.juntar(arquivos) } };
@@ -144,7 +144,7 @@ const FERRAMENTAS = [
     aceita: 'image/*',
     varios: true,
     dica: 'Arraste as imagens aqui',
-    tipos: 'JPG, PNG, WEBP · pode escolher várias',
+    tipos: 'JPG, PNG, WEBP · segure Ctrl para escolher várias de uma vez',
     controles: () => seletor('margem', 'Margem em volta', [
       ['0', 'Sem margem'],
       ['20', 'Pequena'],
@@ -308,9 +308,12 @@ function abrir(f) {
   $('aviso').hidden = !f.aviso;
   $('aviso').textContent = f.aviso || '';
 
+  $('limpar').textContent = f.varios ? 'Limpar a lista' : 'Trocar arquivo';
+
   $('grade').hidden = true;
   $('tela').hidden = false;
   $('trabalho').hidden = true;
+  $('maisArquivos').hidden = true;
   $('drop').hidden = false;
   $('estado').hidden = true;
   $('barra').hidden = true;
@@ -389,9 +392,36 @@ function receber(arquivos) {
   escolhidos = atual.varios ? escolhidos.concat(bons) : [bons[0]];
   $('drop').hidden = true;
   $('trabalho').hidden = false;
+  $('maisArquivos').hidden = !atual.varios;
   $('estado').hidden = true;
   listar();
 }
+
+// Escolher mais arquivos depois do primeiro. A área de soltar some quando o
+// trabalho começa, e sem este botão não sobrava nenhum caminho para o segundo
+// arquivo — que em "Juntar PDF" é o ponto inteiro da ferramenta.
+$('maisArquivos').addEventListener('click', () => $('file').click());
+
+// Soltar arquivos também funciona sobre a lista já montada, que é o gesto
+// natural de quem quer acrescentar mais um.
+['dragenter', 'dragover'].forEach((ev) =>
+  $('trabalho').addEventListener(ev, (e) => {
+    if (!atual || !atual.varios) return;
+    e.preventDefault();
+    $('trabalho').classList.add('recebendo');
+  })
+);
+['dragleave', 'drop'].forEach((ev) =>
+  $('trabalho').addEventListener(ev, (e) => {
+    if (ev === 'dragleave' && $('trabalho').contains(e.relatedTarget)) return;
+    $('trabalho').classList.remove('recebendo');
+  })
+);
+$('trabalho').addEventListener('drop', (e) => {
+  if (!atual || !atual.varios || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  receber([...e.dataTransfer.files]);
+});
 
 /**
  * A lista dos arquivos escolhidos, arrastável quando a ordem importa —
@@ -422,7 +452,12 @@ $('arquivos').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tirar]');
   if (!b) return;
   escolhidos.splice(Number(b.dataset.tirar), 1);
-  if (!escolhidos.length) { $('trabalho').hidden = true; $('drop').hidden = false; return; }
+  if (!escolhidos.length) {
+    $('trabalho').hidden = true;
+    $('maisArquivos').hidden = true;
+    $('drop').hidden = false;
+    return;
+  }
   listar();
 });
 
@@ -452,6 +487,7 @@ $('arquivos').addEventListener('dragend', () => {
 $('limpar').addEventListener('click', () => {
   escolhidos = [];
   $('trabalho').hidden = true;
+  $('maisArquivos').hidden = true;
   $('drop').hidden = false;
   $('estado').hidden = true;
 });

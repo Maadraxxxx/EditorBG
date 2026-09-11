@@ -111,7 +111,9 @@ a.brand:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 4px;
  * Cada plaqueta usa a MESMA cor do cartao da ferramenta na home: quem
  * chega pela logo e quem chega pelos cartoes ve a mesma associacao.
  */
-.logo-marca { position: relative; width: 66px; height: 46px; flex-shrink: 0; }
+/* 84px e nao 66: com quatro plaquetas e os mesmos 9px de sobreposicao, as
+   quatro ocupam 28 + 3x19 = 85. Apertar mais escondia a do meio. */
+.logo-marca { position: relative; width: 84px; height: 46px; flex-shrink: 0; }
 
 .logo-tile {
   position: absolute;
@@ -124,7 +126,7 @@ a.brand:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 4px;
 /* A tesoura fica na frente: remover fundo e o que trouxe a maioria aqui. */
 .logo-tesoura {
   bottom: 0; left: 0;
-  z-index: 3;
+  z-index: 4;
   background: linear-gradient(135deg, #818cf8, var(--accent) 50%, #4f46e5);
   box-shadow: 0 6px 16px rgba(79, 70, 229, .45);
   transform: rotate(-8deg);
@@ -132,15 +134,23 @@ a.brand:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 4px;
 }
 .logo-brilho {
   top: 9px; left: 19px;
-  z-index: 2;
+  z-index: 3;
   background: linear-gradient(135deg, #fcd34d, #f59e0b 60%, #d97706);
   color: #3b2200;
   box-shadow: 0 5px 14px rgba(217, 119, 6, .4);
   transform: rotate(2deg);
   border: 1.5px solid var(--bg);
 }
+.logo-pdf {
+  bottom: 2px; left: 37px;
+  z-index: 2;
+  background: linear-gradient(135deg, #f87171, #dc2743 55%, #b91c1c);
+  box-shadow: 0 5px 14px rgba(220, 39, 67, .4);
+  transform: rotate(-5deg);
+  border: 1.5px solid var(--bg);
+}
 .logo-recorte {
-  top: 0; right: 0;
+  top: 0; left: 56px;
   /* Sobreposição de 9px entre as plaquetas, não de 15: com mais que isso a do
      meio ficava quase inteira escondida atrás da da frente, e a marca voltava
      a parecer de duas ferramentas. */
@@ -2383,3 +2393,23 @@ body[data-mode="pdf"] main { max-width: 1320px; }
 .pdf-acoes .btn { justify-content: center; }
 .pdf-erro { color: var(--err); }
 .home-icon-pdf { background: linear-gradient(135deg, #dc2743, #b91c1c); box-shadow: 0 8px 22px rgba(220, 39, 67, .3); }
+
+.pdf-mais {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px;
+  border: 1px dashed var(--line-forte);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.pdf-mais:hover { background: var(--realce-2); border-color: var(--accent); }
+
+/* Soltar arquivos sobre a lista já montada acrescenta mais. */
+.pdf-trabalho.recebendo .pdf-arquivos {
+  outline: 2px dashed var(--accent);
+  outline-offset: 6px;
+  border-radius: 12px;
+}
