@@ -2509,3 +2509,18 @@ body[data-mode="pdf"] main { max-width: 1320px; }
   border-radius: 8px;
 }
 .pdf-diferenca.igual { opacity: .6; }
+
+.pdf-saida {
+  margin: 0;
+  padding: 14px 16px;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--campo);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

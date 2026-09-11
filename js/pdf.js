@@ -6,13 +6,18 @@
  * numerar e converter para imagem são manipulação de estrutura e desenho —
  * o pdf-lib e o pdf.js fazem tudo isso no navegador.
  *
- * Converter para Word ou Excel é outra coisa: exige reconstruir um documento
- * editável a partir de glifos soltos posicionados na página, que é trabalho de
- * servidor com software pesado. Por isso não está aqui, e não vai estar
- * enquanto a promessa de não enviar arquivo continuar de pé.
+ * Converter para Word e Excel é mais difícil, mas cabe aqui também: o PDF
+ * guarda letras com posição e corpo, não parágrafos e colunas, então a
+ * estrutura precisa ser DEDUZIDA — pelo tamanho da letra, no caso dos títulos,
+ * e pelo alinhamento dos X, no caso das tabelas. O resultado é um documento
+ * editável de verdade, e não uma foto da página; o que se perde é o layout
+ * milimétrico, que o PDF simplesmente não tem para entregar.
  *
- * As duas bibliotecas são carregadas sob demanda, não no topo: quem entra na
- * página só para ver as opções não deve baixar megabytes à toa.
+ * Senha e reparo passam pelo MuPDF, que é uma biblioteca de PDF completa
+ * compilada para WebAssembly.
+ *
+ * TODAS as bibliotecas são carregadas sob demanda, não no topo: quem entra na
+ * página só para ver as opções não deve baixar dezenas de megabytes à toa.
  */
 
 let libPromise = null;
@@ -878,4 +883,735 @@ export async function reparar(arquivo, senha) {
   // garbage=compact joga fora objeto órfão e reescreve o índice do zero.
   const saida = doc.saveToBuffer('garbage=compact,compress').asUint8Array();
   return { blob: comoPdf(saida), paginas, bytes: saida.length };
+}
+
+/* ------------------------------------------------------------------ *
+ * Estrutura do texto — base das conversões para Office
+ * ------------------------------------------------------------------ */
+
+/**
+ * Lê o PDF e devolve as linhas com o nível de título já decidido.
+ *
+ * É a mesma leitura que o Markdown usa, separada aqui porque Word, Excel e
+ * Markdown precisam exatamente do mesmo trabalho: o PDF guarda letras com
+ * posição e corpo, e a estrutura tem que ser deduzida disso. Fazer essa dedução
+ * três vezes daria três resultados diferentes para o mesmo arquivo.
+ */
+export async function estrutura(arquivo) {
+  const J = await leitor();
+  const doc = await J.getDocument({ data: await bytesDe(arquivo) }).promise;
+  const paginas = [];
+
+  for (let n = 1; n <= doc.numPages; n++) {
+    const pagina = await doc.getPage(n);
+    const conteudo = await pagina.getTextContent();
+
+    const linhas = [];
+    let atual = null;
+    for (const item of conteudo.items) {
+      if (!item.str) continue;
+      const y = Math.round(item.transform[5]);
+      const x = Math.round(item.transform[4]);
+      const corpo = Math.abs(item.transform[3]) || item.height || 0;
+      const negrito = /bold|black|heavy/i.test(item.fontName || '');
+
+      if (!atual || Math.abs(y - atual.y) > 2) {
+        if (atual) linhas.push(atual);
+        atual = { y, x, texto: '', corpo, negrito, pedacos: [] };
+      }
+      atual.texto += item.str;
+      atual.pedacos.push({ x, texto: item.str, largura: item.width || 0 });
+      atual.corpo = Math.max(atual.corpo, corpo);
+      atual.negrito = atual.negrito && negrito;
+      if (item.hasEOL) { linhas.push(atual); atual = null; }
+    }
+    if (atual) linhas.push(atual);
+
+    const uteis = linhas.filter((l) => l.texto.trim());
+    if (!uteis.length) { paginas.push({ pagina: n, linhas: [] }); continue; }
+
+    // A régua é o tamanho com mais CARACTERES, não a mediana das linhas: numa
+    // página de poucas linhas a mediana cai em cima de um título, e aí o título
+    // vira a própria régua e deixa de se destacar.
+    const porTamanho = new Map();
+    for (const l of uteis) {
+      const chave = Math.round(l.corpo * 2) / 2;
+      porTamanho.set(chave, (porTamanho.get(chave) || 0) + l.texto.trim().length);
+    }
+    let base = 1;
+    let maior = -1;
+    for (const [t, letras] of porTamanho) if (letras > maior) { maior = letras; base = t; }
+
+    // O nível sai da ORDEM dos tamanhos: limiar fixo que separa 30 de 18 num
+    // documento erra no próximo.
+    const niveis = new Map();
+    [...porTamanho.keys()].filter((t) => t > base * 1.08).sort((a, b) => b - a)
+      .forEach((t, i) => niveis.set(t, Math.min(3, i + 1)));
+
+    paginas.push({
+      pagina: n,
+      base,
+      linhas: uteis.map((l) => ({
+        texto: l.texto.trim(),
+        corpo: l.corpo,
+        negrito: l.negrito,
+        x: l.x,
+        y: l.y,
+        pedacos: l.pedacos,
+        nivel: niveis.get(Math.round(l.corpo * 2) / 2) || 0,
+      })),
+    });
+  }
+  return paginas;
+}
+
+/* ------------------------------------------------------------------ *
+ * PDF para Word
+ * ------------------------------------------------------------------ */
+
+let docxPromise = null;
+function libDocx() {
+  if (!docxPromise) docxPromise = import('https://cdn.jsdelivr.net/npm/docx@9.0.2/+esm');
+  return docxPromise;
+}
+
+/**
+ * Gera um .docx editável a partir do texto do PDF.
+ *
+ * O que sai é um documento de VERDADE — com títulos, parágrafos e negrito — e
+ * não uma foto da página dentro do Word. O que NÃO sai é o layout original:
+ * colunas, tabelas desenhadas e posicionamento milimétrico se perdem, porque o
+ * PDF não guarda essa informação, guarda só onde cada letra foi parar.
+ *
+ * Linhas seguidas do mesmo tamanho são juntadas num parágrafo só: no PDF cada
+ * linha visual é um registro separado, e copiar isso para o Word produziria um
+ * documento em que cada linha quebra sozinha e nada reflui ao editar.
+ */
+export async function paraWord(arquivo) {
+  const D = await libDocx();
+  const paginas = await estrutura(arquivo);
+  const filhos = [];
+
+  for (const p of paginas) {
+    let acumulado = [];
+    let negritoDoBloco = false;
+
+    const fechar = () => {
+      if (!acumulado.length) return;
+      filhos.push(new D.Paragraph({
+        children: [new D.TextRun({ text: acumulado.join(' '), bold: negritoDoBloco })],
+        spacing: { after: 160 },
+      }));
+      acumulado = [];
+      negritoDoBloco = false;
+    };
+
+    for (const l of p.linhas) {
+      if (l.nivel) {
+        fechar();
+        filhos.push(new D.Paragraph({
+          text: l.texto,
+          heading: l.nivel === 1 ? D.HeadingLevel.HEADING_1
+            : l.nivel === 2 ? D.HeadingLevel.HEADING_2 : D.HeadingLevel.HEADING_3,
+          spacing: { before: 240, after: 120 },
+        }));
+        continue;
+      }
+      if (/^[•·▪◦-]\s+/.test(l.texto)) {
+        fechar();
+        filhos.push(new D.Paragraph({
+          text: l.texto.replace(/^[•·▪◦-]\s+/, ''),
+          bullet: { level: 0 },
+        }));
+        continue;
+      }
+      if (!acumulado.length) negritoDoBloco = l.negrito;
+      acumulado.push(l.texto);
+    }
+    fechar();
+
+    if (p.pagina < paginas.length) {
+      filhos.push(new D.Paragraph({ children: [new D.PageBreak()] }));
+    }
+  }
+
+  if (!filhos.length) {
+    throw new Error('Este PDF não tem texto — provavelmente é digitalizado. '
+      + 'Passe pelo OCR primeiro e depois converta.');
+  }
+
+  const doc = new D.Document({ sections: [{ children: filhos }] });
+  const bytes = await D.Packer.toBlob(doc);
+  return bytes;
+}
+
+/* ------------------------------------------------------------------ *
+ * PDF para Excel
+ * ------------------------------------------------------------------ */
+
+let xlsxPromise = null;
+function libXlsx() {
+  if (!xlsxPromise) xlsxPromise = import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+  return xlsxPromise;
+}
+
+/**
+ * Reconstrói as tabelas pela POSIÇÃO horizontal dos pedaços de texto.
+ *
+ * Um PDF não sabe o que é uma tabela: o que existe são textos em coordenadas.
+ * Mas numa tabela as colunas se alinham, e é isso que dá para aproveitar —
+ * agrupando os X que se repetem página abaixo, aparecem as colunas.
+ *
+ * A tolerância de 12 pontos existe porque texto centralizado ou alinhado à
+ * direita numa célula não começa no mesmo X do cabeçalho, e exigir alinhamento
+ * exato espalharia uma tabela de 4 colunas em 20.
+ */
+export async function paraExcel(arquivo) {
+  const X = await libXlsx();
+  const paginas = await estrutura(arquivo);
+  const livro = X.utils.book_new();
+  let alguma = false;
+
+  for (const p of paginas) {
+    if (!p.linhas.length) continue;
+
+    // Onde as colunas começam: X que aparecem em muitas linhas diferentes.
+    const contagem = new Map();
+    for (const l of p.linhas) {
+      for (const ped of l.pedacos) {
+        if (!ped.texto.trim()) continue;
+        const chave = Math.round(ped.x / 12) * 12;
+        contagem.set(chave, (contagem.get(chave) || 0) + 1);
+      }
+    }
+    const colunas = [...contagem.entries()]
+      .filter(([, quantas]) => quantas >= 2)
+      .map(([x]) => x)
+      .sort((a, b) => a - b);
+
+    if (!colunas.length) continue;
+
+    const linhas = p.linhas.map((l) => {
+      const celulas = new Array(colunas.length).fill('');
+      for (const ped of l.pedacos) {
+        if (!ped.texto.trim()) continue;
+        // A coluna mais próxima à esquerda do pedaço.
+        let melhor = 0;
+        for (let i = 0; i < colunas.length; i++) if (ped.x >= colunas[i] - 12) melhor = i;
+        celulas[melhor] = (celulas[melhor] + ' ' + ped.texto).trim();
+      }
+      return celulas;
+    }).filter((c) => c.some((v) => v));
+
+    if (!linhas.length) continue;
+    const aba = X.utils.aoa_to_sheet(linhas);
+    X.utils.book_append_sheet(livro, aba, 'Página ' + p.pagina);
+    alguma = true;
+  }
+
+  if (!alguma) {
+    throw new Error('Não encontrei nada em formato de tabela neste PDF. '
+      + 'Se ele for digitalizado, passe pelo OCR primeiro.');
+  }
+
+  const bytes = X.write(livro, { bookType: 'xlsx', type: 'array' });
+  return new Blob([bytes], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * PDF para PowerPoint
+ * ------------------------------------------------------------------ */
+
+let pptxPromise = null;
+function libPptx() {
+  if (!pptxPromise) pptxPromise = import('https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/+esm');
+  return pptxPromise;
+}
+
+const paraBase64 = (blob) => new Promise((res) => {
+  const fr = new FileReader();
+  fr.onload = () => res(fr.result);
+  fr.readAsDataURL(blob);
+});
+
+/**
+ * Cada página vira um slide, com a página desenhada por inteiro.
+ *
+ * Aqui a imagem é a resposta certa e não uma limitação: quem converte PDF para
+ * apresentação quer projetar o que já está pronto, e reconstruir o slide em
+ * caixas de texto editáveis erraria posição, fonte e cor em todas elas.
+ */
+export async function paraPowerPoint(arquivo, aoProgredir = () => {}) {
+  const Pptx = await libPptx();
+  const imagens = await paraImagens(arquivo, { escala: 2, tipo: 'png' }, aoProgredir);
+  const info = await informacoes(arquivo);
+
+  const pres = new (Pptx.default || Pptx)();
+  // O slide fica com a proporção da página: forçar 16:9 numa página A4 em pé
+  // deixaria duas tarjas enormes nas laterais.
+  const proporcao = info.largura / info.altura;
+  const largura = 10;
+  const altura = Number((largura / proporcao).toFixed(2));
+  pres.defineLayout({ name: 'PAGINA', width: largura, height: altura });
+  pres.layout = 'PAGINA';
+
+  for (const img of imagens) {
+    const slide = pres.addSlide();
+    slide.addImage({ data: await paraBase64(img.blob), x: 0, y: 0, w: largura, h: altura });
+  }
+
+  const saida = await pres.write({ outputType: 'blob' });
+  return saida;
+}
+
+/* ------------------------------------------------------------------ *
+ * Office para PDF
+ * ------------------------------------------------------------------ */
+
+/** Quebra o texto em linhas que cabem na largura, medindo na fonte de verdade. */
+function quebrarLinhas(texto, fonte, tamanho, largura) {
+  const linhas = [];
+  for (const paragrafo of String(texto).split('\n')) {
+    const palavras = paragrafo.split(/\s+/).filter(Boolean);
+    if (!palavras.length) { linhas.push(''); continue; }
+    let atual = '';
+    for (const palavra of palavras) {
+      const teste = atual ? atual + ' ' + palavra : palavra;
+      if (fonte.widthOfTextAtSize(teste, tamanho) <= largura) { atual = teste; continue; }
+      if (atual) linhas.push(atual);
+      // Palavra sozinha maior que a linha (um link comprido, por exemplo):
+      // corta no meio, senão ela vaza para fora da margem.
+      atual = palavra;
+      while (fonte.widthOfTextAtSize(atual, tamanho) > largura && atual.length > 1) {
+        let corte = atual.length - 1;
+        while (corte > 1 && fonte.widthOfTextAtSize(atual.slice(0, corte), tamanho) > largura) corte--;
+        linhas.push(atual.slice(0, corte));
+        atual = atual.slice(corte);
+      }
+    }
+    if (atual) linhas.push(atual);
+  }
+  return linhas;
+}
+
+/**
+ * As fontes padrão do PDF só conhecem o alfabeto ocidental. Um caractere fora
+ * disso derruba a geração inteira com um erro incompreensível, então os poucos
+ * que aparecem de verdade são traduzidos e o resto vira interrogação — um
+ * documento com um símbolo errado é melhor do que nenhum documento.
+ */
+function limparTexto(t) {
+  return String(t)
+    .replace(/[‘’‛]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/…/g, '...')
+    .replace(/[   ]/g, ' ')
+    // Fora do Latin-1 ainda existem os extras do WinAnsi, que as fontes padrao
+    // do PDF conhecem: marcador, travessao, moeda, marca registrada. Cortar
+    // esses junto com o resto transformava o marcador de uma lista num ponto
+    // de interrogacao — foi assim que este caso apareceu no teste.
+    .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF€‚ƒ„†‡ˆ‰Š‹ŒŽ•–—˜™š›œžŸ]/g, '?');
+}
+
+/**
+ * Monta um PDF a partir de blocos { texto, tamanho, negrito, recuo }.
+ * É o miolo comum de Word→PDF, Excel→PDF e PowerPoint→PDF.
+ */
+async function pdfDeBlocos(blocos, opcoes = {}) {
+  const { PDFDocument, StandardFonts, rgb } = await lib();
+  const doc = await PDFDocument.create();
+  const normal = await doc.embedFont(StandardFonts.Helvetica);
+  const forte = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  const LARG = opcoes.largura || 595.28;    // A4 em pé
+  const ALT = opcoes.altura || 841.89;
+  const MARGEM = opcoes.margem ?? 56;
+  const util = LARG - MARGEM * 2;
+
+  let pagina = doc.addPage([LARG, ALT]);
+  let y = ALT - MARGEM;
+
+  const novaPagina = () => { pagina = doc.addPage([LARG, ALT]); y = ALT - MARGEM; };
+
+  for (const bloco of blocos) {
+    if (bloco.quebra) { novaPagina(); continue; }
+
+    const tamanho = bloco.tamanho || 11;
+    const fonte = bloco.negrito ? forte : normal;
+    const recuo = bloco.recuo || 0;
+    const alturaLinha = tamanho * 1.45;
+    const linhas = quebrarLinhas(limparTexto(bloco.texto), fonte, tamanho, util - recuo);
+
+    if (bloco.antes) y -= bloco.antes;
+
+    for (const linha of linhas) {
+      if (y - alturaLinha < MARGEM) novaPagina();
+      if (linha) {
+        pagina.drawText(linha, {
+          x: MARGEM + recuo,
+          y: y - tamanho,
+          size: tamanho,
+          font: fonte,
+          color: rgb(0.08, 0.09, 0.13),
+        });
+      }
+      y -= alturaLinha;
+    }
+    y -= bloco.depois ?? tamanho * 0.5;
+  }
+
+  return comoPdf(await doc.save());
+}
+
+let mammothPromise = null;
+/** O mammoth só publica build de navegador em UMD; o ESM do CDN vem quebrado. */
+function libMammoth() {
+  if (!mammothPromise) {
+    mammothPromise = new Promise((res, rej) => {
+      if (self.mammoth) return res(self.mammoth);
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
+      s.onload = () => res(self.mammoth);
+      s.onerror = () => rej(new Error('Não foi possível carregar o conversor de Word.'));
+      document.head.append(s);
+    });
+  }
+  return mammothPromise;
+}
+
+/**
+ * Word para PDF, passando pelo HTML.
+ *
+ * O texto sai como TEXTO no PDF, não como imagem: continua dando para buscar,
+ * copiar e selecionar. O preço é o layout — margens exatas, cabeçalho, rodapé e
+ * posicionamento de imagem não sobrevivem, porque o que se lê do .docx é a
+ * estrutura do conteúdo, não a página montada.
+ */
+export async function deWord(arquivo) {
+  const mammoth = await libMammoth();
+  const { value: html } = await mammoth.convertToHtml({ arrayBuffer: await bytesDe(arquivo) });
+  const corpo = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstChild;
+
+  const blocos = [];
+  for (const el of corpo.children) {
+    const texto = (el.textContent || '').trim();
+    if (!texto) continue;
+    const tag = el.tagName.toLowerCase();
+
+    if (tag === 'h1') blocos.push({ texto, tamanho: 21, negrito: true, antes: 14, depois: 8 });
+    else if (tag === 'h2') blocos.push({ texto, tamanho: 16.5, negrito: true, antes: 12, depois: 6 });
+    else if (tag === 'h3') blocos.push({ texto, tamanho: 13.5, negrito: true, antes: 10, depois: 5 });
+    else if (tag === 'ul' || tag === 'ol') {
+      [...el.querySelectorAll('li')].forEach((li, i) => {
+        const marcador = tag === 'ol' ? (i + 1) + '. ' : '•  ';
+        blocos.push({ texto: marcador + li.textContent.trim(), tamanho: 11, recuo: 16, depois: 3 });
+      });
+    } else if (tag === 'table') {
+      for (const tr of el.querySelectorAll('tr')) {
+        const celulas = [...tr.children].map((td) => td.textContent.trim()).filter(Boolean);
+        if (celulas.length) blocos.push({ texto: celulas.join('   |   '), tamanho: 10, depois: 2 });
+      }
+      blocos.push({ texto: '', depois: 8 });
+    } else blocos.push({ texto, tamanho: 11, depois: 6 });
+  }
+
+  if (!blocos.length) throw new Error('Este arquivo do Word não tem texto para converter.');
+  return pdfDeBlocos(blocos);
+}
+
+/** Excel para PDF: cada aba vira uma sequência de linhas, em folha deitada. */
+export async function deExcel(arquivo) {
+  const X = await libXlsx();
+  const livro = X.read(await bytesDe(arquivo), { type: 'array' });
+  const blocos = [];
+
+  livro.SheetNames.forEach((nome, i) => {
+    const linhas = X.utils.sheet_to_json(livro.Sheets[nome], { header: 1, blankrows: false });
+    if (!linhas.length) return;
+    if (i > 0) blocos.push({ quebra: true });
+
+    blocos.push({ texto: nome, tamanho: 16, negrito: true, depois: 10 });
+    linhas.forEach((linha, n) => {
+      const celulas = linha.map((c) => (c === null || c === undefined ? '' : String(c)));
+      if (!celulas.some((c) => c.trim())) return;
+      blocos.push({
+        texto: celulas.join('   |   '),
+        tamanho: 9.5,
+        // A primeira linha costuma ser o cabeçalho, e destacá-la é o que torna
+        // a folha legível sem as bordas que o PDF não tem.
+        negrito: n === 0,
+        depois: 2,
+      });
+    });
+  });
+
+  if (!blocos.length) throw new Error('Esta planilha está vazia.');
+  // Deitada: planilha é larga, e em pé as colunas se atropelam.
+  return pdfDeBlocos(blocos, { largura: 841.89, altura: 595.28, margem: 40 });
+}
+
+/**
+ * PowerPoint para PDF.
+ *
+ * Um .pptx é um zip de XML. Dá para ler o texto de cada slide com segurança,
+ * mas não para redesenhar o slide como ele aparece no PowerPoint: posição,
+ * tema, fonte, animação e imagem de fundo estão espalhados por vários arquivos
+ * e dependem do tema aplicado. O que sai é um PDF com o CONTEÚDO de cada
+ * slide, um por página — e a tela diz isso antes de converter.
+ */
+export async function dePowerPoint(arquivo) {
+  const { unzipSync, strFromU8 } = await zipador();
+  const dentro = unzipSync(new Uint8Array(await bytesDe(arquivo)));
+
+  const nomes = Object.keys(dentro)
+    .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
+
+  if (!nomes.length) throw new Error('Não encontrei slides neste arquivo. Ele é mesmo um .pptx?');
+
+  const blocos = [];
+  nomes.forEach((nome, i) => {
+    if (i > 0) blocos.push({ quebra: true });
+    const xml = strFromU8(dentro[nome]);
+
+    // <a:p> é um parágrafo e <a:t> são os pedaços de texto dentro dele. Juntar
+    // por parágrafo evita que uma frase quebrada em três trechos — o que
+    // acontece a cada mudança de formatação — vire três linhas soltas.
+    const paragrafos = [...xml.matchAll(/<a:p\b[\s\S]*?<\/a:p>/g)].map((m) =>
+      [...m[0].matchAll(/<a:t>([\s\S]*?)<\/a:t>/g)]
+        .map((t) => t[1])
+        .join('')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+        .replace(/&amp;/g, '&')
+        .trim(),
+    ).filter(Boolean);
+
+    blocos.push({ texto: 'Slide ' + (i + 1), tamanho: 9, depois: 12 });
+    if (!paragrafos.length) {
+      blocos.push({ texto: '(slide sem texto)', tamanho: 11, depois: 6 });
+      return;
+    }
+    // O primeiro parágrafo é quase sempre o título do slide.
+    blocos.push({ texto: paragrafos[0], tamanho: 20, negrito: true, depois: 14 });
+    for (const p of paragrafos.slice(1)) {
+      blocos.push({ texto: '•  ' + p, tamanho: 12.5, recuo: 14, depois: 6 });
+    }
+  });
+
+  return pdfDeBlocos(blocos, { largura: 841.89, altura: 595.28, margem: 56 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Resumir e traduzir — IA do próprio navegador
+ * ------------------------------------------------------------------ *
+ * O Chrome traz modelos de linguagem que rodam NO APARELHO, sem mandar nada
+ * para lugar nenhum. É o único jeito de ter resumo e tradução aqui sem quebrar
+ * a promessa do site: qualquer serviço de IA na nuvem receberia o documento
+ * inteiro, e documento é justamente o que as pessoas menos querem entregar.
+ *
+ * O preço é que só funciona em navegador que tenha esses modelos. Quando não
+ * tem, a tela diz exatamente isso em vez de falhar sem explicação.
+ */
+
+export function recursosDeIA() {
+  return {
+    resumir: typeof self !== 'undefined' && 'Summarizer' in self,
+    traduzir: typeof self !== 'undefined' && 'Translator' in self,
+  };
+}
+
+/**
+ * Divide o texto em pedaços que cabem num pedido só.
+ *
+ * O modelo tem teto de entrada, e um contrato de trinta páginas passa dele com
+ * folga. O corte é feito em parágrafo inteiro, nunca no meio de uma frase: um
+ * pedaço que começa no meio de uma oração faz o modelo resumir errado.
+ */
+function emPedacos(texto, teto = 3500) {
+  const paragrafos = String(texto).split(/\n{2,}/);
+  const pedacos = [];
+  let atual = '';
+
+  for (const p of paragrafos) {
+    if ((atual + '\n\n' + p).length > teto && atual) { pedacos.push(atual); atual = p; }
+    else atual = atual ? atual + '\n\n' + p : p;
+  }
+  if (atual.trim()) pedacos.push(atual);
+  return pedacos;
+}
+
+/**
+ * Resume.
+ *
+ * Documento comprido é resumido em duas etapas: cada pedaço vira um resumo, e
+ * os resumos viram um resumo só. Jogar tudo de uma vez não caberia, e resumir
+ * apenas o começo entregaria um resumo que ignora o resto do documento sem
+ * avisar — que é pior do que demorar.
+ */
+/**
+ * Confere se o modelo REALMENTE respondeu.
+ *
+ * Existe uma armadilha silenciosa aqui: em builds do Chromium que trazem a API
+ * mas não trazem o modelo baixado, a chamada não dá erro — ela devolve o texto
+ * de entrada de volta, às vezes precedido de um aviso em inglês. Sem esta
+ * conferência, a pessoa receberia o documento inteiro de volta chamado de
+ * "resumo", ou o texto em português chamado de "tradução", sem nenhum sinal de
+ * que deu errado. Entregar um resultado falso é pior do que recusar.
+ */
+/**
+ * Prazo máximo para o navegador responder.
+ *
+ * `Translator.create` e as consultas de disponibilidade podem simplesmente
+ * nunca resolver em builds onde o recurso existe pela metade — não dão erro,
+ * ficam pendurados. Sem prazo, a tela fica "trabalhando" para sempre e a pessoa
+ * não tem como saber que nunca vai terminar.
+ */
+function comPrazo(promessa, segundos, oQue) {
+  return Promise.race([
+    promessa,
+    new Promise((_, rej) => setTimeout(
+      () => rej(new Error('O ' + oQue + ' do navegador não respondeu em '
+        + segundos + ' segundos. Neste aparelho ele não está funcionando.')),
+      segundos * 1000,
+    )),
+  ]);
+}
+
+function conferirResposta(saida, entrada, quem) {
+  const s = String(saida || '').trim();
+
+  if (!s) throw new Error('O ' + quem + ' do navegador não devolveu nada.');
+
+  if (/model not available|not available in chromium/i.test(s)) {
+    throw new Error('Este navegador tem a API de IA mas não tem o modelo instalado. '
+      + 'No Chrome, o modelo é baixado sob demanda e exige espaço em disco e uma '
+      + 'placa de vídeo compatível. Enquanto ele não estiver disponível, esta '
+      + 'ferramenta não funciona — e não vale entregar um resultado inventado.');
+  }
+
+  // Resumo e tradução mudam o texto. Vir praticamente igual ao que entrou é o
+  // sinal de que o modelo devolveu a entrada em vez de trabalhar nela.
+  const e = String(entrada || '').trim();
+  if (e.length > 200 && s.includes(e.slice(0, Math.min(200, e.length)))) {
+    throw new Error('O ' + quem + ' devolveu o texto original sem alterar. '
+      + 'O modelo de IA do navegador não está funcionando neste aparelho.');
+  }
+}
+
+export async function resumir(texto, opcoes = {}, aoProgredir = () => {}) {
+  if (!('Summarizer' in self)) {
+    throw new Error('Este navegador não tem o resumidor local. Ele existe no Chrome '
+      + 'a partir da versão 138, no computador. Nada é enviado para servidor: por isso '
+      + 'depende do navegador ter o modelo.');
+  }
+
+  const criar = () => Summarizer.create({
+    type: opcoes.tipo || 'key-points',
+    format: 'plain-text',
+    length: opcoes.tamanho || 'medium',
+    monitor(m) {
+      m.addEventListener('downloadprogress', (e) => aoProgredir(e.loaded || 0, 'baixando'));
+    },
+  });
+
+  let modelo;
+  try {
+    modelo = await comPrazo(criar(), 90, 'resumidor');
+  } catch (e) {
+    throw new Error(e.message && e.message.includes('não respondeu')
+      ? e.message
+      : 'Não foi possível preparar o resumidor: ' + (e.message || e));
+  }
+
+  try {
+    const pedacos = emPedacos(texto);
+    const parciais = [];
+
+    for (let i = 0; i < pedacos.length; i++) {
+      const parcial = await modelo.summarize(pedacos[i], {
+        context: 'Trecho de um documento em PDF. Responda em português do Brasil.',
+      });
+      conferirResposta(parcial, pedacos[i], 'resumidor');
+      parciais.push(parcial);
+      aoProgredir((i + 1) / (pedacos.length + 1), 'resumindo', i + 1, pedacos.length);
+    }
+
+    if (parciais.length === 1) return parciais[0].trim();
+
+    const junto = await modelo.summarize(parciais.join('\n\n'), {
+      context: 'Resumos parciais de um mesmo documento. Junte num resumo só, '
+        + 'em português do Brasil, sem repetir.',
+    });
+    aoProgredir(1, 'pronto');
+    return junto.trim();
+  } finally {
+    if (modelo.destroy) modelo.destroy();
+  }
+}
+
+/** Idiomas oferecidos. A lista é curta de propósito: são os pares que o modelo local cobre bem. */
+export const IDIOMAS = [
+  ['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'],
+  ['fr', 'Francês'], ['de', 'Alemão'], ['it', 'Italiano'], ['ja', 'Japonês'],
+];
+
+/**
+ * Traduz.
+ *
+ * Traduzir parágrafo a parágrafo e não o documento inteiro de uma vez: o modelo
+ * tem teto de entrada, e assim também dá para mostrar o andamento em vez de
+ * deixar a tela parada por minutos.
+ */
+export async function traduzir(texto, de, para, aoProgredir = () => {}) {
+  if (!('Translator' in self)) {
+    throw new Error('Este navegador não tem o tradutor local. Ele existe no Chrome '
+      + 'a partir da versão 138, no computador. Nada é enviado para servidor: por isso '
+      + 'depende do navegador ter o modelo.');
+  }
+  if (de === para) throw new Error('Escolha idiomas diferentes.');
+
+  let modelo;
+  try {
+    modelo = await comPrazo(Translator.create({
+      sourceLanguage: de,
+      targetLanguage: para,
+      monitor(m) {
+        m.addEventListener('downloadprogress', (e) => aoProgredir(e.loaded || 0, 'baixando'));
+      },
+    }), 90, 'tradutor');
+  } catch (e) {
+    throw new Error(e.message && e.message.includes('não respondeu')
+      ? e.message
+      : 'Este par de idiomas não está disponível neste navegador (' + (e.message || e) + ').');
+  }
+
+  try {
+    const pedacos = emPedacos(texto, 1800);
+    const saida = [];
+    for (let i = 0; i < pedacos.length; i++) {
+      const parte = await modelo.translate(pedacos[i]);
+      conferirResposta(parte, pedacos[i], 'tradutor');
+      saida.push(parte);
+      aoProgredir((i + 1) / pedacos.length, 'traduzindo', i + 1, pedacos.length);
+    }
+    return saida.join('\n\n');
+  } finally {
+    if (modelo.destroy) modelo.destroy();
+  }
+}
+
+/** Texto solto vira PDF legível — usado pela tradução e pelo resumo. */
+export async function textoParaPdf(texto, titulo) {
+  const blocos = [];
+  if (titulo) blocos.push({ texto: titulo, tamanho: 18, negrito: true, depois: 14 });
+  for (const p of String(texto).split(/\n{2,}/)) {
+    const limpo = p.trim();
+    if (limpo) blocos.push({ texto: limpo, tamanho: 11, depois: 8 });
+  }
+  if (!blocos.length) throw new Error('Não há texto para gerar o PDF.');
+  return pdfDeBlocos(blocos);
 }

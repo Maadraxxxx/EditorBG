@@ -32,6 +32,11 @@ const ICONES = {
   numeros: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16.5h8"/><path d="M9.5 12.5v-4l-1.5 1"/><path d="M13 8.5h2.5v2H13v2h2.5"/>'),
   marca: svg('<path d="M12 2.5 4 6v6c0 4.5 3.4 8.2 8 9.5 4.6-1.3 8-5 8-9.5V6Z"/><path d="M8.5 12.5h7"/>'),
   comprimir: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="m8.5 8.5 7 7M15.5 8.5l-7 7"/>'),
+  word: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8 12 1.6 5 1.9-5 1.9 5L15 12"/>'),
+  excel: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8.5 12 5 5m0-5-5 5"/>'),
+  ppt: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="M8.5 17v-5h2.6a1.7 1.7 0 0 1 0 3.4H8.5"/>'),
+  ia: svg('<path d="M9.5 3.5 11 7.5l4 1.5-4 1.5-1.5 4-1.5-4L4 9l4-1.5Z"/><path d="M17 14l.8 2.2 2.2.8-2.2.8L17 20l-.8-2.2-2.2-.8 2.2-.8Z"/>'),
+  traduzir: svg('<path d="M3.5 6h8M7.5 4v2c0 4-1.7 7-4 9"/><path d="M5 11c1.5 2.5 3.5 4 6.5 5"/><path d="m12.5 20 4-9 4 9"/><path d="M14 17h5"/>'),
   cadeado: svg('<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.5" r="1.4"/>'),
   cadeadoAberto: svg('<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 7.6-1.7"/><circle cx="12" cy="15.5" r="1.4"/>'),
   reparar: svg('<path d="M14.5 6.5a3.5 3.5 0 0 0 4.6 4.6l-8 8a2.3 2.3 0 0 1-3.2-3.2l8-8a3.5 3.5 0 0 0-1.4-1.4Z"/><path d="m5 5 3 3"/>'),
@@ -477,6 +482,171 @@ const FERRAMENTAS = [
         recado: r.paginas + (r.paginas === 1 ? ' página recuperada' : ' páginas recuperadas')
           + ' · ' + tamanho(r.bytes) + '.',
       };
+    },
+  },
+  {
+    id: 'para-word',
+    nome: 'PDF para Word',
+    sobre: 'Gera um .docx editável, com títulos, parágrafos e listas.',
+    icone: 'word',
+    aceita: 'application/pdf',
+    aviso: 'Sai um documento editável de verdade, não uma foto da página. O que não '
+      + 'sobrevive é o layout milimétrico — colunas e posicionamento exato — porque o '
+      + 'PDF não guarda isso, guarda só onde cada letra foi parar.',
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.docx',
+        blob: await PDF.paraWord(arquivos[0]),
+      } };
+    },
+  },
+  {
+    id: 'para-excel',
+    nome: 'PDF para Excel',
+    sobre: 'Reconstrói as tabelas do PDF numa planilha, uma aba por página.',
+    icone: 'excel',
+    aceita: 'application/pdf',
+    aviso: 'As colunas são descobertas pelo alinhamento do texto, porque o PDF não '
+      + 'sabe o que é uma tabela. Funciona bem em tabela alinhada; em texto corrido, '
+      + 'o resultado é só o texto em linhas.',
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.xlsx',
+        blob: await PDF.paraExcel(arquivos[0]),
+      } };
+    },
+  },
+  {
+    id: 'para-ppt',
+    nome: 'PDF para PowerPoint',
+    sobre: 'Cada página vira um slide, com a página inteira desenhada nele.',
+    icone: 'ppt',
+    aceita: 'application/pdf',
+    async rodar(arquivos, aoProgredir) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.pptx',
+        blob: await PDF.paraPowerPoint(arquivos[0], aoProgredir),
+      } };
+    },
+  },
+  {
+    id: 'de-word',
+    nome: 'Word para PDF',
+    sobre: 'Converte .docx em PDF, mantendo o texto selecionável.',
+    icone: 'word',
+    aceita: '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    dica: 'Arraste o arquivo do Word aqui',
+    tipos: 'DOCX · o formato do Word moderno',
+    aviso: 'O texto sai como texto, dá para buscar e copiar. Margens exatas, cabeçalho '
+      + 'e rodapé não sobrevivem: o que se lê do .docx é o conteúdo, não a página montada.',
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.pdf',
+        blob: await PDF.deWord(arquivos[0]),
+      } };
+    },
+  },
+  {
+    id: 'de-excel',
+    nome: 'Excel para PDF',
+    sobre: 'Converte planilha em PDF, em folha deitada, uma aba por vez.',
+    icone: 'excel',
+    aceita: '.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    dica: 'Arraste a planilha aqui',
+    tipos: 'XLSX, XLS, CSV',
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.pdf',
+        blob: await PDF.deExcel(arquivos[0]),
+      } };
+    },
+  },
+  {
+    id: 'de-ppt',
+    nome: 'PowerPoint para PDF',
+    sobre: 'Passa o conteúdo dos slides para PDF, um slide por página.',
+    icone: 'ppt',
+    aceita: '.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    dica: 'Arraste a apresentação aqui',
+    tipos: 'PPTX · o formato do PowerPoint moderno',
+    aviso: 'Sai o CONTEÚDO de cada slide, não o slide desenhado. Tema, posição, cor e '
+      + 'imagem de fundo dependem de arquivos espalhados dentro do .pptx e não são '
+      + 'reproduzidos aqui.',
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.pdf',
+        blob: await PDF.dePowerPoint(arquivos[0]),
+      } };
+    },
+  },
+  {
+    id: 'resumir',
+    nome: 'Resumir com IA',
+    sobre: 'Lê o documento e escreve os pontos principais. A IA roda no seu aparelho.',
+    icone: 'ia',
+    aceita: 'application/pdf',
+    aviso: 'A IA é a do próprio navegador e roda no seu computador: o documento não é '
+      + 'enviado para lugar nenhum. Por isso depende do Chrome 138 ou mais novo, no '
+      + 'computador — em outro navegador a ferramenta avisa que não dá.',
+    controles: () => seletor('tipo', 'Formato do resumo', [
+      ['key-points', 'Pontos principais'],
+      ['tldr', 'Um parágrafo'],
+      ['teaser', 'Chamada curta'],
+    ]) + seletor('tamanho', 'Tamanho', [
+      ['short', 'Curto'], ['medium', 'Médio'], ['long', 'Longo'],
+    ]) + seletor('saida', 'O que baixar', [['txt', 'Texto (.txt)'], ['pdf', 'PDF']]),
+    async rodar(arquivos, aoProgredir) {
+      const texto = await PDF.paraTexto(arquivos[0]);
+      if (!texto.trim()) {
+        throw new Error('Este PDF não tem texto — passe pelo OCR primeiro.');
+      }
+      const resumo = await PDF.resumir(texto, {
+        tipo: $('tipo').value, tamanho: $('tamanho').value,
+      }, (f, fase, feito, total) => {
+        aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
+        if (fase === 'baixando') dizer('Baixando o modelo de IA do navegador…');
+        else if (fase === 'resumindo') dizer('Resumindo o trecho ' + feito + ' de ' + total + '…');
+      });
+
+      const base = PDF.semExtensao(arquivos[0].name);
+      mostrarTexto('Resumo', resumo);
+      if ($('saida').value === 'pdf') {
+        return { unico: { nome: base + '-resumo.pdf', blob: await PDF.textoParaPdf(resumo, 'Resumo') },
+          recado: 'Resumo pronto, abaixo e no arquivo baixado.' };
+      }
+      return { unico: { nome: base + '-resumo.txt', blob: new Blob([resumo], { type: 'text/plain;charset=utf-8' }) },
+        recado: 'Resumo pronto, abaixo e no arquivo baixado.' };
+    },
+  },
+  {
+    id: 'traduzir',
+    nome: 'Traduzir PDF',
+    sobre: 'Traduz o texto do documento. A tradução roda no seu aparelho.',
+    icone: 'traduzir',
+    aceita: 'application/pdf',
+    aviso: 'A tradução é a do próprio navegador e roda no seu computador: o documento '
+      + 'não é enviado para lugar nenhum. Por isso depende do Chrome 138 ou mais novo. '
+      + 'Sai o texto traduzido, não o PDF original com as palavras trocadas no lugar.',
+    controles: () => seletor('de', 'Idioma do documento', PDF.IDIOMAS)
+      + seletor('para', 'Traduzir para', PDF.IDIOMAS.slice().reverse())
+      + seletor('saida', 'O que baixar', [['pdf', 'PDF'], ['txt', 'Texto (.txt)']]),
+    async rodar(arquivos, aoProgredir) {
+      const texto = await PDF.paraTexto(arquivos[0]);
+      if (!texto.trim()) throw new Error('Este PDF não tem texto — passe pelo OCR primeiro.');
+
+      const traduzido = await PDF.traduzir(texto, $('de').value, $('para').value,
+        (f, fase, feito, total) => {
+          aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
+          if (fase === 'baixando') dizer('Baixando o modelo de tradução do navegador…');
+          else if (fase === 'traduzindo') dizer('Traduzindo o trecho ' + feito + ' de ' + total + '…');
+        });
+
+      const base = PDF.semExtensao(arquivos[0].name) + '-' + $('para').value;
+      mostrarTexto('Tradução', traduzido);
+      if ($('saida').value === 'txt') {
+        return { unico: { nome: base + '.txt', blob: new Blob([traduzido], { type: 'text/plain;charset=utf-8' }) } };
+      }
+      return { unico: { nome: base + '.pdf', blob: await PDF.textoParaPdf(traduzido, null) } };
     },
   },
 ];
@@ -1175,4 +1345,13 @@ async function mostrarCampoDeSenha(arquivos) {
   const pede = await PDF.pedeSenha(arquivos[0]);
   campo.hidden = !pede;
   if (pede) dizer('Este arquivo pede senha para abrir. Escreva-a no campo acima.');
+}
+
+
+/** Mostra na tela o texto gerado — resumo e tradução, que valem mais lidos do que baixados. */
+function mostrarTexto(titulo, texto) {
+  $('extra').hidden = false;
+  $('extra').innerHTML = '<span class="aj-titulo"></span><pre class="pdf-saida"></pre>';
+  $('extra').querySelector('.aj-titulo').textContent = titulo;
+  $('extra').querySelector('.pdf-saida').textContent = texto;
 }
