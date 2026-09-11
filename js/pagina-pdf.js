@@ -587,41 +587,47 @@ const FERRAMENTAS = [
   },
   {
     id: 'resumir',
-    nome: 'Resumir com IA',
-    sobre: 'Lê o documento e escreve os pontos principais. A IA roda no seu aparelho.',
+    nome: 'Resumir PDF',
+    sobre: 'Escolhe as frases mais representativas do documento e monta um resumo.',
     icone: 'ia',
     aceita: 'application/pdf',
-    aviso: 'A IA é a do próprio navegador e roda no seu computador: o documento não é '
-      + 'enviado para lugar nenhum. Por isso depende do Chrome 138 ou mais novo, no '
-      + 'computador — em outro navegador a ferramenta avisa que não dá.',
-    controles: () => seletor('tipo', 'Formato do resumo', [
-      ['key-points', 'Pontos principais'],
-      ['tldr', 'Um parágrafo'],
-      ['teaser', 'Chamada curta'],
-    ]) + seletor('tamanho', 'Tamanho', [
-      ['short', 'Curto'], ['medium', 'Médio'], ['long', 'Longo'],
+    aviso: 'Funciona em qualquer navegador, na hora, sem baixar nada e sem enviar o '
+      + 'documento para lugar nenhum. O resumo é feito selecionando as frases que já '
+      + 'estão no texto — nada é reescrito, então nada é parafraseado errado. Se o seu '
+      + 'navegador tiver um modelo de linguagem instalado, ele escreve o resumo com '
+      + 'palavras próprias; mas isso é um bônus, não uma exigência.',
+    controles: () => seletor('tamanho', 'Tamanho', [
+      ['curto', 'Curto'], ['medio', 'Médio'], ['longo', 'Longo'],
+    ]) + seletor('formato', 'Formato', [
+      ['pontos', 'Em tópicos'], ['corrido', 'Texto corrido'],
+    ]) + seletor('metodo', 'Método', [
+      ['auto', 'Automático · usa a IA do navegador se houver'],
+      ['extrair', 'Só selecionar frases · sempre igual'],
     ]) + seletor('saida', 'O que baixar', [['txt', 'Texto (.txt)'], ['pdf', 'PDF']]),
     async rodar(arquivos, aoProgredir) {
       const texto = await PDF.paraTexto(arquivos[0]);
-      if (!texto.trim()) {
-        throw new Error('Este PDF não tem texto — passe pelo OCR primeiro.');
-      }
+      if (!texto.trim()) throw new Error('Este PDF não tem texto — passe pelo OCR primeiro.');
+
       const resumo = await PDF.resumir(texto, {
-        tipo: $('tipo').value, tamanho: $('tamanho').value,
+        tamanho: $('tamanho').value,
+        formato: $('formato').value,
+        metodo: $('metodo').value,
       }, (f, fase, feito, total) => {
         aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
-        if (fase === 'baixando') dizer('Baixando o modelo de IA do navegador…');
-        else if (fase === 'resumindo') dizer('Resumindo o trecho ' + feito + ' de ' + total + '…');
+        if (fase === 'baixando') dizer('Preparando o modelo do navegador…');
+        else if (fase === 'resumindo') dizer('Trecho ' + feito + ' de ' + total + '…');
       });
 
       const base = PDF.semExtensao(arquivos[0].name);
+      const corte = Math.round((1 - resumo.length / texto.length) * 100);
       mostrarTexto('Resumo', resumo);
+
       if ($('saida').value === 'pdf') {
         return { unico: { nome: base + '-resumo.pdf', blob: await PDF.textoParaPdf(resumo, 'Resumo') },
-          recado: 'Resumo pronto, abaixo e no arquivo baixado.' };
+          recado: 'Resumo pronto — ' + corte + '% menor que o documento.' };
       }
       return { unico: { nome: base + '-resumo.txt', blob: new Blob([resumo], { type: 'text/plain;charset=utf-8' }) },
-        recado: 'Resumo pronto, abaixo e no arquivo baixado.' };
+        recado: 'Resumo pronto — ' + corte + '% menor que o documento.' };
     },
   },
   {
@@ -630,9 +636,11 @@ const FERRAMENTAS = [
     sobre: 'Traduz o texto do documento. A tradução roda no seu aparelho.',
     icone: 'traduzir',
     aceita: 'application/pdf',
-    aviso: 'A tradução é a do próprio navegador e roda no seu computador: o documento '
-      + 'não é enviado para lugar nenhum. Por isso depende do Chrome 138 ou mais novo. '
-      + 'Sai o texto traduzido, não o PDF original com as palavras trocadas no lugar.',
+    aviso: 'Funciona em qualquer navegador. Se o seu tiver tradutor embutido, a tradução '
+      + 'é instantânea; se não tiver, o site baixa um modelo de tradução de cerca de 400 MB '
+      + 'na PRIMEIRA vez — depois ele fica guardado e funciona até sem internet. Em '
+      + 'qualquer um dos dois casos o documento não sai do seu aparelho. Sai o texto '
+      + 'traduzido, não o PDF original com as palavras trocadas de lugar.',
     controles: () => seletor('de', 'Idioma do documento', PDF.IDIOMAS)
       + seletor('para', 'Traduzir para', PDF.IDIOMAS.slice().reverse())
       + seletor('saida', 'O que baixar', [['pdf', 'PDF'], ['txt', 'Texto (.txt)']]),
@@ -643,7 +651,10 @@ const FERRAMENTAS = [
       const traduzido = await PDF.traduzir(texto, $('de').value, $('para').value,
         (f, fase, feito, total) => {
           aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
-          if (fase === 'baixando') dizer('Baixando o modelo de tradução do navegador…');
+          if (fase === 'baixando') {
+          dizer('Baixando o modelo de tradução — só desta vez, cerca de 400 MB. '
+            + 'Depois ele fica guardado no navegador.');
+        }
           else if (fase === 'traduzindo') dizer('Traduzindo o trecho ' + feito + ' de ' + total + '…');
         });
 

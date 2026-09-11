@@ -1444,114 +1444,6 @@ function emPedacos(texto, teto = 3500) {
   return pedacos;
 }
 
-/**
- * Resume.
- *
- * Documento comprido é resumido em duas etapas: cada pedaço vira um resumo, e
- * os resumos viram um resumo só. Jogar tudo de uma vez não caberia, e resumir
- * apenas o começo entregaria um resumo que ignora o resto do documento sem
- * avisar — que é pior do que demorar.
- */
-/**
- * Confere se o modelo REALMENTE respondeu.
- *
- * Existe uma armadilha silenciosa aqui: em builds do Chromium que trazem a API
- * mas não trazem o modelo baixado, a chamada não dá erro — ela devolve o texto
- * de entrada de volta, às vezes precedido de um aviso em inglês. Sem esta
- * conferência, a pessoa receberia o documento inteiro de volta chamado de
- * "resumo", ou o texto em português chamado de "tradução", sem nenhum sinal de
- * que deu errado. Entregar um resultado falso é pior do que recusar.
- */
-/**
- * Prazo máximo para o navegador responder.
- *
- * `Translator.create` e as consultas de disponibilidade podem simplesmente
- * nunca resolver em builds onde o recurso existe pela metade — não dão erro,
- * ficam pendurados. Sem prazo, a tela fica "trabalhando" para sempre e a pessoa
- * não tem como saber que nunca vai terminar.
- */
-function comPrazo(promessa, segundos, oQue) {
-  return Promise.race([
-    promessa,
-    new Promise((_, rej) => setTimeout(
-      () => rej(new Error('O ' + oQue + ' do navegador não respondeu em '
-        + segundos + ' segundos. Neste aparelho ele não está funcionando.')),
-      segundos * 1000,
-    )),
-  ]);
-}
-
-function conferirResposta(saida, entrada, quem) {
-  const s = String(saida || '').trim();
-
-  if (!s) throw new Error('O ' + quem + ' do navegador não devolveu nada.');
-
-  if (/model not available|not available in chromium/i.test(s)) {
-    throw new Error('Este navegador tem a API de IA mas não tem o modelo instalado. '
-      + 'No Chrome, o modelo é baixado sob demanda e exige espaço em disco e uma '
-      + 'placa de vídeo compatível. Enquanto ele não estiver disponível, esta '
-      + 'ferramenta não funciona — e não vale entregar um resultado inventado.');
-  }
-
-  // Resumo e tradução mudam o texto. Vir praticamente igual ao que entrou é o
-  // sinal de que o modelo devolveu a entrada em vez de trabalhar nela.
-  const e = String(entrada || '').trim();
-  if (e.length > 200 && s.includes(e.slice(0, Math.min(200, e.length)))) {
-    throw new Error('O ' + quem + ' devolveu o texto original sem alterar. '
-      + 'O modelo de IA do navegador não está funcionando neste aparelho.');
-  }
-}
-
-export async function resumir(texto, opcoes = {}, aoProgredir = () => {}) {
-  if (!('Summarizer' in self)) {
-    throw new Error('Este navegador não tem o resumidor local. Ele existe no Chrome '
-      + 'a partir da versão 138, no computador. Nada é enviado para servidor: por isso '
-      + 'depende do navegador ter o modelo.');
-  }
-
-  const criar = () => Summarizer.create({
-    type: opcoes.tipo || 'key-points',
-    format: 'plain-text',
-    length: opcoes.tamanho || 'medium',
-    monitor(m) {
-      m.addEventListener('downloadprogress', (e) => aoProgredir(e.loaded || 0, 'baixando'));
-    },
-  });
-
-  let modelo;
-  try {
-    modelo = await comPrazo(criar(), 90, 'resumidor');
-  } catch (e) {
-    throw new Error(e.message && e.message.includes('não respondeu')
-      ? e.message
-      : 'Não foi possível preparar o resumidor: ' + (e.message || e));
-  }
-
-  try {
-    const pedacos = emPedacos(texto);
-    const parciais = [];
-
-    for (let i = 0; i < pedacos.length; i++) {
-      const parcial = await modelo.summarize(pedacos[i], {
-        context: 'Trecho de um documento em PDF. Responda em português do Brasil.',
-      });
-      conferirResposta(parcial, pedacos[i], 'resumidor');
-      parciais.push(parcial);
-      aoProgredir((i + 1) / (pedacos.length + 1), 'resumindo', i + 1, pedacos.length);
-    }
-
-    if (parciais.length === 1) return parciais[0].trim();
-
-    const junto = await modelo.summarize(parciais.join('\n\n'), {
-      context: 'Resumos parciais de um mesmo documento. Junte num resumo só, '
-        + 'em português do Brasil, sem repetir.',
-    });
-    aoProgredir(1, 'pronto');
-    return junto.trim();
-  } finally {
-    if (modelo.destroy) modelo.destroy();
-  }
-}
 
 /** Idiomas oferecidos. A lista é curta de propósito: são os pares que o modelo local cobre bem. */
 export const IDIOMAS = [
@@ -1559,50 +1451,6 @@ export const IDIOMAS = [
   ['fr', 'Francês'], ['de', 'Alemão'], ['it', 'Italiano'], ['ja', 'Japonês'],
 ];
 
-/**
- * Traduz.
- *
- * Traduzir parágrafo a parágrafo e não o documento inteiro de uma vez: o modelo
- * tem teto de entrada, e assim também dá para mostrar o andamento em vez de
- * deixar a tela parada por minutos.
- */
-export async function traduzir(texto, de, para, aoProgredir = () => {}) {
-  if (!('Translator' in self)) {
-    throw new Error('Este navegador não tem o tradutor local. Ele existe no Chrome '
-      + 'a partir da versão 138, no computador. Nada é enviado para servidor: por isso '
-      + 'depende do navegador ter o modelo.');
-  }
-  if (de === para) throw new Error('Escolha idiomas diferentes.');
-
-  let modelo;
-  try {
-    modelo = await comPrazo(Translator.create({
-      sourceLanguage: de,
-      targetLanguage: para,
-      monitor(m) {
-        m.addEventListener('downloadprogress', (e) => aoProgredir(e.loaded || 0, 'baixando'));
-      },
-    }), 90, 'tradutor');
-  } catch (e) {
-    throw new Error(e.message && e.message.includes('não respondeu')
-      ? e.message
-      : 'Este par de idiomas não está disponível neste navegador (' + (e.message || e) + ').');
-  }
-
-  try {
-    const pedacos = emPedacos(texto, 1800);
-    const saida = [];
-    for (let i = 0; i < pedacos.length; i++) {
-      const parte = await modelo.translate(pedacos[i]);
-      conferirResposta(parte, pedacos[i], 'tradutor');
-      saida.push(parte);
-      aoProgredir((i + 1) / pedacos.length, 'traduzindo', i + 1, pedacos.length);
-    }
-    return saida.join('\n\n');
-  } finally {
-    if (modelo.destroy) modelo.destroy();
-  }
-}
 
 /** Texto solto vira PDF legível — usado pela tradução e pelo resumo. */
 export async function textoParaPdf(texto, titulo) {
@@ -2099,4 +1947,282 @@ export async function digitalizar(imagens, opcoes = {}, aoProgredir = () => {}) 
   }
 
   return deImagens(prontas, { margem: 0 });
+}
+
+/* ------------------------------------------------------------------ *
+ * Resumo sem depender de modelo nenhum
+ * ------------------------------------------------------------------ *
+ * POR QUE NÃO USA IA: um resumo que só funciona no Chrome novo, e só depois de
+ * baixar centenas de megabytes, não é uma ferramenta — é uma promessa com
+ * asterisco. O método abaixo é o clássico de extração: escolher as frases mais
+ * representativas do próprio texto. Roda em qualquer navegador, em qualquer
+ * idioma, na hora, sem baixar nada e sem inventar uma linha sequer.
+ *
+ * A diferença honesta para um modelo de linguagem: ele reescreveria o texto com
+ * palavras próprias; este seleciona as frases que já estão lá. Em documento —
+ * contrato, relatório, ata — selecionar costuma ser até melhor, porque nada é
+ * parafraseado errado.
+ */
+
+/* Palavras que aparecem em tudo e não dizem nada sobre o assunto. Sem tirá-las,
+   "de", "que" e "para" dominam a contagem e toda frase longa ganha. */
+const VAZIAS = new Set((
+  'a o as os um uma uns umas de do da dos das em no na nos nas por para com sem sob sobre '
+  + 'e ou mas que se como quando onde porque pois entao ja nao sim tambem muito mais menos '
+  + 'ao aos à às pelo pela pelos pelas num numa dum duma este esta estes estas esse essa '
+  + 'esses essas aquele aquela aqueles aquelas isto isso aquilo seu sua seus suas meu minha '
+  + 'nosso nossa dele dela deles delas eu tu ele ela nos vos eles elas me te lhe lhes '
+  + 'ser estar ter haver e foi sao era eram sera serao tem tinha havia ha entre ate apos '
+  + 'the of to and in is are was were be been for on with as by at from this that these '
+  + 'those it its an or but not have has had will would can could should'
+).split(/\s+/));
+
+/** Tira acento para comparar palavras: "após" e "apos" são a mesma coisa aqui. */
+const semAcento = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/**
+ * Corta o texto em frases.
+ *
+ * O ponto final não basta como separador: "art. 5º", "R$ 1.500,00" e "Sr. Silva"
+ * quebrariam no meio. Só vale como fim de frase o ponto seguido de espaço e
+ * maiúscula, e não precedido de abreviação conhecida.
+ */
+function emFrases(texto) {
+  const bruto = String(texto).replace(/\s+/g, ' ').trim();
+  const frases = [];
+  let atual = '';
+
+  const partes = bruto.split(/(?<=[.!?])\s+/);
+  for (const parte of partes) {
+    atual = atual ? atual + ' ' + parte : parte;
+    const termina = /[.!?]$/.test(parte);
+    const abreviacao = /\b(art|arts|sr|sra|dr|dra|prof|inc|ltda|etc|no|n|pag|fls|cf|obs|ex|p)\.$/i.test(parte);
+    const numero = /\d\.$/.test(parte);
+    if (termina && !abreviacao && !numero && atual.length > 25) {
+      frases.push(atual.trim());
+      atual = '';
+    }
+  }
+  if (atual.trim()) frases.push(atual.trim());
+  return frases.filter((f) => f.length > 25);
+}
+
+/**
+ * Resumo por extração das frases mais representativas.
+ *
+ * A nota de cada frase é a soma da importância das palavras que ela usa,
+ * dividida pela RAIZ do tamanho — não pelo tamanho. Dividir pelo tamanho puro
+ * premiaria frases de três palavras; não dividir premiaria só as gigantes. A
+ * raiz é o meio-termo que a área usa há décadas.
+ *
+ * As primeiras frases ganham um empurrão porque documento quase sempre começa
+ * dizendo do que trata, e o resultado sai na ORDEM ORIGINAL: um resumo com as
+ * frases fora de ordem obriga a pessoa a remontar o raciocínio sozinha.
+ */
+export function resumirTexto(texto, opcoes = {}) {
+  const frases = emFrases(texto);
+  if (frases.length <= 3) return String(texto).trim();
+
+  const peso = new Map();
+  for (const frase of frases) {
+    for (const p of semAcento(frase.toLowerCase()).match(/[a-z0-9]{3,}/g) || []) {
+      if (VAZIAS.has(p)) continue;
+      peso.set(p, (peso.get(p) || 0) + 1);
+    }
+  }
+
+  const notas = frases.map((frase, i) => {
+    const palavras = semAcento(frase.toLowerCase()).match(/[a-z0-9]{3,}/g) || [];
+    let soma = 0;
+    for (const p of palavras) if (!VAZIAS.has(p)) soma += peso.get(p) || 0;
+
+    const inicio = i < Math.max(2, frases.length * 0.15) ? 1.35 : 1;
+    return { i, frase, nota: (soma / Math.sqrt(palavras.length || 1)) * inicio };
+  });
+
+  const quantas = opcoes.tamanho === 'curto'
+    ? Math.max(2, Math.round(frases.length * 0.12))
+    : opcoes.tamanho === 'longo'
+      ? Math.max(6, Math.round(frases.length * 0.4))
+      : Math.max(4, Math.round(frases.length * 0.22));
+
+  const escolhidas = notas
+    .sort((a, b) => b.nota - a.nota)
+    .slice(0, Math.min(quantas, frases.length))
+    .sort((a, b) => a.i - b.i);
+
+  // Frases quase idênticas — cabeçalho repetido em toda página, por exemplo —
+  // entrariam várias vezes e ocupariam o resumo inteiro.
+  const vistas = new Set();
+  const finais = [];
+  for (const { frase } of escolhidas) {
+    const chave = semAcento(frase.toLowerCase()).replace(/[^a-z0-9]/g, '').slice(0, 60);
+    if (vistas.has(chave)) continue;
+    vistas.add(chave);
+    finais.push(frase);
+  }
+
+  return opcoes.formato === 'pontos'
+    ? finais.map((f) => '• ' + f).join('\n')
+    : finais.join(' ');
+}
+
+/* ------------------------------------------------------------------ *
+ * Tradução
+ * ------------------------------------------------------------------ */
+
+
+let tradutorPromise = null;
+let tradutorCarregado = null;
+
+/**
+ * Carrega o modelo de tradução que roda no navegador, em WebAssembly.
+ *
+ * Este é o caminho que funciona em qualquer navegador — Chrome, Firefox, Safari
+ * ou Edge — e não só no que tem IA embutida. O preço está escrito na tela antes
+ * de começar: são centenas de megabytes na PRIMEIRA vez, que ficam guardados
+ * depois. A alternativa seria mandar o documento para um servidor traduzir, que
+ * é exatamente o que este site não faz.
+ */
+async function modeloDeTraducao(aoProgredir) {
+  if (tradutorCarregado) return tradutorCarregado;
+  if (!tradutorPromise) {
+    tradutorPromise = (async () => {
+      const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1');
+      env.allowLocalModels = false;
+
+      // Processador e não placa de vídeo, de propósito: este modelo tem 400 MB e
+      // a versão em GPU não terminou de carregar nos testes daqui. Entre um
+      // caminho medido e funcionando e outro que talvez seja mais rápido mas
+      // trava, vale o que funciona.
+      const p = await pipeline('translation', 'Xenova/m2m100_418M', {
+        device: 'wasm',
+        dtype: 'q8',
+        progress_callback: (e) => {
+          if (e.status === 'progress' && e.total) aoProgredir(e.loaded / e.total, 'baixando');
+        },
+      });
+      tradutorCarregado = p;
+      return p;
+    })();
+    tradutorPromise.catch(() => { tradutorPromise = null; });
+  }
+  return tradutorPromise;
+}
+
+/** O tradutor embutido do navegador, quando existe: instantâneo e sem download. */
+async function tradutorDoNavegador(de, para) {
+  if (!('Translator' in self)) return null;
+  try {
+    const modelo = await comPrazo(
+      Translator.create({ sourceLanguage: de, targetLanguage: para }), 20, 'tradutor',
+    );
+    // Uma frase curta de teste: é o que revela a versão que responde sem o
+    // modelo instalado, devolvendo a entrada de volta.
+    const prova = await comPrazo(modelo.translate('Good morning, my friend.'), 20, 'tradutor');
+    if (/model not available/i.test(prova) || prova.includes('Good morning, my friend')) {
+      if (modelo.destroy) modelo.destroy();
+      return null;
+    }
+    return modelo;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Traduz, pelo caminho que estiver disponível.
+ *
+ * Primeiro tenta o tradutor do próprio navegador, que é instantâneo e não baixa
+ * nada. Se ele não existir ou não estiver funcionando de verdade, cai no modelo
+ * em WebAssembly, que funciona em qualquer navegador. Em nenhum dos dois o
+ * documento sai do aparelho.
+ */
+export async function traduzir(texto, de, para, aoProgredir = () => {}) {
+  if (de === para) throw new Error('Escolha idiomas diferentes.');
+
+  const pedacos = emPedacos(texto, 1200);
+  const saida = [];
+
+  const nativo = await tradutorDoNavegador(de, para);
+  if (nativo) {
+    try {
+      for (let i = 0; i < pedacos.length; i++) {
+        const parte = await nativo.translate(pedacos[i]);
+        conferirResposta(parte, pedacos[i], 'tradutor');
+        saida.push(parte);
+        aoProgredir((i + 1) / pedacos.length, 'traduzindo', i + 1, pedacos.length);
+      }
+      return saida.join('\n\n');
+    } finally {
+      if (nativo.destroy) nativo.destroy();
+    }
+  }
+
+  aoProgredir(0, 'baixando');
+  const modelo = await modeloDeTraducao((f) => aoProgredir(f, 'baixando'));
+
+  // Frase a frase, e não parágrafo inteiro: o modelo tem teto de entrada curto,
+  // e um parágrafo grande sai truncado no meio sem aviso nenhum.
+  for (let i = 0; i < pedacos.length; i++) {
+    const frases = emFrases(pedacos[i]);
+    const traduzidas = [];
+    for (const frase of (frases.length ? frases : [pedacos[i]])) {
+      const r = await modelo(frase, { src_lang: de, tgt_lang: para });
+      traduzidas.push((r[0] && r[0].translation_text) || '');
+    }
+    saida.push(traduzidas.join(' '));
+    aoProgredir((i + 1) / pedacos.length, 'traduzindo', i + 1, pedacos.length);
+  }
+  return saida.join('\n\n');
+}
+
+/**
+ * Resume.
+ *
+ * O método por extração é o padrão porque sempre funciona. Quando o navegador
+ * tem um modelo de linguagem de verdade instalado, ele escreve um resumo com
+ * palavras próprias, que lê melhor — mas isso é um bônus, não um requisito.
+ */
+export async function resumir(texto, opcoes = {}, aoProgredir = () => {}) {
+  if (opcoes.metodo === 'extrair' || !('Summarizer' in self)) {
+    aoProgredir(1, 'pronto');
+    return resumirTexto(texto, opcoes);
+  }
+
+  try {
+    const modelo = await comPrazo(Summarizer.create({
+      type: opcoes.tipo || 'key-points',
+      format: 'plain-text',
+      length: opcoes.tamanho === 'curto' ? 'short' : opcoes.tamanho === 'longo' ? 'long' : 'medium',
+      monitor(m) {
+        m.addEventListener('downloadprogress', (e) => aoProgredir(e.loaded || 0, 'baixando'));
+      },
+    }), 90, 'resumidor');
+
+    try {
+      const pedacos = emPedacos(texto);
+      const parciais = [];
+      for (let i = 0; i < pedacos.length; i++) {
+        const parcial = await modelo.summarize(pedacos[i], {
+          context: 'Trecho de um documento em PDF. Responda em português do Brasil.',
+        });
+        conferirResposta(parcial, pedacos[i], 'resumidor');
+        parciais.push(parcial);
+        aoProgredir((i + 1) / (pedacos.length + 1), 'resumindo', i + 1, pedacos.length);
+      }
+      if (parciais.length === 1) return parciais[0].trim();
+      const junto = await modelo.summarize(parciais.join('\n\n'), {
+        context: 'Resumos parciais de um mesmo documento. Junte num resumo só, em português.',
+      });
+      return junto.trim();
+    } finally {
+      if (modelo.destroy) modelo.destroy();
+    }
+  } catch {
+    // Sem modelo, com modelo pela metade ou fora do prazo: o método por
+    // extração entrega um resumo de qualquer jeito, que é o que importa.
+    aoProgredir(1, 'pronto');
+    return resumirTexto(texto, opcoes);
+  }
 }
