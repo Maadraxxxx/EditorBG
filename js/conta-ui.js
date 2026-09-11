@@ -24,6 +24,7 @@ let modo = 'entrar';   // 'entrar' | 'cadastrar'
 
 // Sem o provedor configurado, o botão só daria erro: melhor nem mostrar.
 $('contaGoogle').hidden = !Conta.GOOGLE_ATIVO;
+$('contaOu').hidden = !Conta.GOOGLE_ATIVO;
 
 /* ------------------------------------------------------------------ *
  * Botão no cabeçalho

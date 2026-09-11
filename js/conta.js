@@ -20,8 +20,15 @@ import { vipAtivo, plano as buscarPlano } from './planos.js';
 export const SUPABASE_URL = 'https://lbbzrmvmezywmeghofzd.supabase.co';
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiYnpybXZtZXp5d21lZ2hvZnpkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MTU1NjgsImV4cCI6MjEwNDM5MTU2OH0.HjwpcNxyAiLFzBTiqPArR0sdjNniR8mpaFLwgLQmrSo';
 
-/** Só ligue depois de configurar o provedor Google no painel do Supabase. */
-export const GOOGLE_ATIVO = false;
+/**
+ * Entrar com Google.
+ *
+ * Ligado aqui NÃO basta: o provedor precisa estar habilitado no painel do
+ * Supabase, com o Client ID e o Secret vindos do Google Cloud. Sem isso o
+ * botão aparece e o clique volta com erro — que está traduzido lá embaixo
+ * justamente para dizer o que falta, em vez de devolver o texto em inglês.
+ */
+export const GOOGLE_ATIVO = true;
 
 export const CONFIGURADO = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
@@ -262,6 +269,14 @@ function traduzir(msg) {
   if (m.includes('auth session missing')) return 'O link expirou. Peça outro e-mail de recuperação.';
   if (m.includes('token has expired') || m.includes('invalid or has expired')) {
     return 'Esse link já foi usado ou passou da validade. Peça outro.';
+  }
+  // Este chega quando o botão do Google existe mas o provedor não foi ligado
+  // no Supabase. A mensagem crua ("Unsupported provider") não ajuda ninguém.
+  if (m.includes('unsupported provider') || m.includes('provider is not enabled')) {
+    return 'O login com Google ainda não foi configurado neste site.';
+  }
+  if (m.includes('redirect_uri_mismatch')) {
+    return 'O endereço de retorno não está liberado no Google. Fale com o suporte.';
   }
   return msg;
 }
