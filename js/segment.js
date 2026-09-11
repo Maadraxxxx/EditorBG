@@ -6,6 +6,7 @@
  * que devolve a imagem em RGBA com o alpha já preenchido. Só nos interessa esse
  * canal alpha — o resto do app trabalha com a máscara.
  */
+import { PRECISAO_GPU } from './limites.js';
 import {
   pipeline,
   RawImage,
@@ -19,14 +20,14 @@ export const MODELS = {
     id: 'briaai/RMBG-1.4',
     nome: 'Padrão',
     descricao: 'Rápido, funciona em qualquer máquina. ~44 MB.',
-    dtype: { webgpu: 'fp32', wasm: 'q8' },
+    dtype: { webgpu: PRECISAO_GPU, wasm: 'q8' },
     gpuOnly: false,
   },
   finos: {
     id: 'onnx-community/ISNet-ONNX',
     nome: 'Detalhes finos',
     descricao: 'Outro treino (DIS5K), bom em objetos vazados e hastes finas. ~44 MB.',
-    dtype: { webgpu: 'fp32', wasm: 'q8' },
+    dtype: { webgpu: PRECISAO_GPU, wasm: 'q8' },
     vip: true,
   },
 };

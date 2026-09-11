@@ -23,7 +23,7 @@ const card = $('edEmptyCard');
 const pick = $('edPick');
 const fileInput = $('edFile');
 
-const MAX_DIM = 3000;   // mesmo limite da outra página, por memória
+import { MAX_DIM } from './limites.js';
 
 /* ------------------------------------------------------------------ *
  * Estado vazio

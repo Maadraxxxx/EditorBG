@@ -9,10 +9,9 @@ import { baixar as baixarComPlano } from './paywall.js';
 import * as Conta from './conta.js';
 import './conta-ui.js';
 import { refreshSliders } from './sliders.js';
+import { MAX_DIM, AREA_MAX_CANVAS, ehIOS, ehCelular } from './limites.js';
 
 const $ = (id) => document.getElementById(id);
-
-const MAX_DIM = 3000;   // mesmo teto das outras páginas, por memória
 
 let original = null;    // bitmap da imagem carregada
 let atual = null;       // canvas com o resultado
@@ -96,7 +95,7 @@ async function carregar(file) {
   const c = document.createElement('canvas');
   c.width = bitmap.width; c.height = bitmap.height;
   c.getContext('2d').drawImage(bitmap, 0, 0);
-  $('imgAntes').src = c.toDataURL('image/png');
+  trocarImagem('antes', c);
 
   prepararIA();
   await aplicar();
@@ -134,8 +133,33 @@ async function aplicar() {
   mostrar(atual);
 }
 
+/**
+ * Endereços temporários das duas imagens da comparação.
+ *
+ * Antes isto era `toDataURL`, e era o que matava a aba no iPhone: o data URL
+ * é a imagem inteira virada TEXTO dentro da memória do JavaScript — numa foto
+ * de 3000px são dezenas de megabytes — e `mostrar()` roda a cada movimento de
+ * slider. Com blob o navegador guarda os bytes fora do heap e ainda evita a
+ * codificação em base64, que é pura perda.
+ *
+ * Cada endereço precisa ser devolvido quando troca, senão o vazamento só muda
+ * de lugar: eles ficam vivos até a aba fechar.
+ */
+const enderecos = { antes: null, depois: null };
+
+function trocarImagem(qual, canvas) {
+  const alvo = qual === 'antes' ? $('imgAntes') : $('imgDepois');
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const novo = URL.createObjectURL(blob);
+    if (enderecos[qual]) URL.revokeObjectURL(enderecos[qual]);
+    enderecos[qual] = novo;
+    alvo.src = novo;
+  }, 'image/png');
+}
+
 function mostrar(canvas) {
-  $('imgDepois').src = canvas.toDataURL('image/png');
+  trocarImagem('depois', canvas);
   $('medidas').textContent = canvas.width + ' × ' + canvas.height + ' px';
 }
 
@@ -260,6 +284,23 @@ function prepararIA() {
   const segundos = M.estimarSegundos(original.width, original.height, motor);
   const nota = $('iaNota');
 
+  // Um canvas grande demais não dá erro no Safari do iOS: ele devolve a tela
+  // em branco. Recusar com explicação é melhor do que a pessoa esperar
+  // minutos para receber uma imagem vazia.
+  const areaDobrada = original.width * 2 * original.height * 2;
+  if (areaDobrada > AREA_MAX_CANVAS) {
+    $('botaoIA').disabled = true;
+    $('botaoIA').textContent = 'Dobrar com IA';
+    $('iaBarra').hidden = true;
+    $('iaEstado').hidden = true;
+    nota.className = 'mq-nota mq-demora';
+    nota.textContent =
+      'Esta imagem é grande demais para dobrar neste aparelho'
+      + (ehIOS ? ' — o iPhone e o iPad têm um limite de tamanho de imagem' : '')
+      + '. Use uma foto menor, ou abra o site no computador.';
+    return;
+  }
+
   $('botaoIA').disabled = false;
   $('botaoIA').textContent = 'Dobrar com IA · ' + M.tempoEscrito(segundos);
   $('iaBarra').hidden = true;
@@ -268,8 +309,13 @@ function prepararIA() {
   nota.textContent =
     'Vai de ' + original.width + '×' + original.height + ' para '
     + (original.width * 2) + '×' + (original.height * 2) + '. '
-    + 'Nesta imagem leva ' + M.tempoEscrito(segundos) + ', rodando no SEU computador — '
-    + 'a aba precisa ficar aberta.';
+    + 'Nesta imagem leva ' + M.tempoEscrito(segundos)
+    + (ehCelular ? ', rodando no SEU aparelho — ' : ', rodando no SEU computador — ')
+    // No celular não basta deixar a aba aberta: trocar de aplicativo congela a
+    // página, e no iPhone o sistema chega a descartar a aba inteira.
+    + (ehCelular
+      ? 'mantenha a tela ligada e não troque de aplicativo.'
+      : 'a aba precisa ficar aberta.');
 
   // Acima de dois minutos o aviso deixa de ser informação e passa a ser
   // decisão: quem não souber quanto tempo vai esperar, desiste no meio.

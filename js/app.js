@@ -11,7 +11,7 @@ import { baixar as baixarComPlano, abrirPaywall, temHD, aplicarLimite } from './
 import * as Conta from './conta.js';
 import './conta-ui.js';
 
-const MAX_DIM = 3000; // limite de segurança para não estourar memória com fotos gigantes
+import { MAX_DIM } from './limites.js';
 
 /* ------------------------------------------------------------------ *
  * Elementos

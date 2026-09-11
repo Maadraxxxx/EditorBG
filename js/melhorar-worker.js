@@ -18,6 +18,7 @@ import {
   RawImage,
   env,
 } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+import { PRECISAO_GPU } from './limites.js';
 
 env.allowLocalModels = false;
 
@@ -74,7 +75,7 @@ self.onmessage = async (e) => {
         if (await temGpu()) {
           try {
             modelo = await pipeline('image-to-image', MODELO, {
-              device: 'webgpu', dtype: 'fp32', progress_callback: aviso,
+              device: 'webgpu', dtype: PRECISAO_GPU, progress_callback: aviso,
             });
             dispositivo = 'webgpu';
           } catch (e) {
