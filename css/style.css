@@ -801,9 +801,11 @@ input[type="range"]:focus-visible { outline: 2px solid var(--accent-2); outline-
   overflow-y: auto;
 }
 
+/* Três colunas e não quatro: com nove ferramentas, quatro por linha deixava a
+   última sozinha num canto. Em três, as nove fecham um quadrado certinho. */
 .ed-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--line);
 }
 .ed-tabs button {
@@ -1174,6 +1176,31 @@ input[type="range"]:focus-visible { outline: 2px solid var(--accent-2); outline-
   touch-action: none;
 }
 .ed-stage.tool-brush #edCanvas { cursor: none; }
+.ed-stage.tool-rabisco #edCanvas { cursor: crosshair; }
+
+/* ---------- rabiscar à mão livre ---------- */
+.rab-paleta {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.rab-paleta button {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--line-forte);
+  background: var(--cor);
+  cursor: pointer;
+  padding: 0;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+.rab-paleta button:hover { transform: translateY(-2px); }
+.rab-paleta button.is-active {
+  border-color: var(--accent);
+  /* O anel por fora e não a borda por dentro: numa bolinha branca a borda
+     colorida some contra o fundo claro do painel. */
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .3);
+}
 
 .brush-cursor {
   position: absolute;

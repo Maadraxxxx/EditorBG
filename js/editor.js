@@ -297,6 +297,17 @@ function scheduleDraw() {
    da edição — o arquivo baixado continua saindo com a marca. */
 let marcaOculta = false;
 
+/* Rabisco à mão livre. A espessura do painel está em pixels de TELA, não da
+   imagem: é o que a pessoa vê sob o mouse na hora de riscar. Na hora de virar
+   camada ela é convertida para a escala da foto, senão o mesmo traço sairia
+   grosso numa imagem de 500px e quase invisível numa de 4000px. */
+let rabiscoCor = '#ef4444';
+let rabiscoEspessura = 6;
+
+function espessuraNaImagem() {
+  return Math.max(0.5, rabiscoEspessura / ((S.scaleX + S.scaleY) / 2));
+}
+
 function draw() {
   if (!S) return;
   const g = geom();
@@ -328,6 +339,15 @@ function draw() {
     ctx.save();
     ctx.setTransform(m);
     L.desenharCamadas(ctx, S.layers);
+    ctx.restore();
+  }
+
+  // O traço em andamento ainda não é camada: vai à parte, na mesma matriz,
+  // para acompanhar o mouse enquanto a mão anda.
+  if (S.rabisco) {
+    ctx.save();
+    ctx.setTransform(m);
+    L.desenharTraco(ctx, S.rabisco.pontos, rabiscoCor, espessuraNaImagem());
     ctx.restore();
   }
 
@@ -404,7 +424,7 @@ function paintCropBox() {
 /* ------------------------------------------------------------------ *
  * Camadas: seleção e manipulação
  * ------------------------------------------------------------------ */
-const FERRAMENTAS_CAMADA = ['texto', 'elementos', 'uploads'];
+const FERRAMENTAS_CAMADA = ['texto', 'elementos', 'uploads', 'rabisco'];
 const RAIO_ALCA = 7;
 
 function modoCamadas() {
@@ -574,6 +594,7 @@ function selectTool(tool) {
   [...el.tabs.children].forEach((b) => b.classList.toggle('is-active', b.dataset.tool === tool));
   document.querySelectorAll('.ed-panel').forEach((p) => p.classList.toggle('is-active', p.dataset.panel === tool));
   el.stage.classList.toggle('tool-brush', tool === 'brush');
+  el.stage.classList.toggle('tool-rabisco', tool === 'rabisco' && !modoMoverRabisco());
   el.cursor.hidden = tool !== 'brush';
   if (!modoCamadas()) S.sel = null;
   atualizarPainelSelecao();
@@ -658,6 +679,17 @@ el.canvas.addEventListener('pointerdown', (e) => {
     return;
   }
 
+  // Com a caneta na mão, arrastar sobre a foto sempre desenha — nunca arrasta
+  // o traço que está embaixo. Sem isso, riscar por cima de um rabisco pronto
+  // sairia empurrando ele pelo canvas, e escrever uma letra sobre a outra
+  // ficaria impossível. Mover um traço pronto é o que o interruptor "Mover
+  // traços" liga: aí a ferramenta passa a se comportar como as outras camadas.
+  if (S.tool === 'rabisco' && !modoMoverRabisco()) {
+    S.rabisco = { pontos: [{ x: p.x, y: p.y }] };
+    scheduleDraw();
+    return;
+  }
+
   const alvoCamada = L.camadaEm(S.layers, p.x, p.y);
   if (alvoCamada) {
     if (alvoCamada !== S.sel) selecionar(alvoCamada);
@@ -669,6 +701,20 @@ el.canvas.addEventListener('pointerdown', (e) => {
 });
 
 el.canvas.addEventListener('pointermove', (e) => {
+  if (S && S.rabisco) {
+    const p = toSource(e);
+    const ultimo = S.rabisco.pontos[S.rabisco.pontos.length - 1];
+    // Filtro de distância medido EM PIXELS DE TELA: sem ele, uma foto de
+    // 4000px guardaria milhares de pontos por traço, e num zoom pequeno o
+    // mesmo movimento da mão geraria muito mais pontos que num zoom grande.
+    const dist = Math.hypot((p.x - ultimo.x) * S.scaleX, (p.y - ultimo.y) * S.scaleY);
+    if (dist >= 2) {
+      S.rabisco.pontos.push({ x: p.x, y: p.y });
+      scheduleDraw();
+    }
+    return;
+  }
+
   if (!S || !S.arraste) return;
   const p = toSource(e);
   const a = S.arraste;
@@ -689,9 +735,30 @@ el.canvas.addEventListener('pointermove', (e) => {
 
 ['pointerup', 'pointercancel'].forEach((ev) =>
   el.canvas.addEventListener(ev, () => {
+    if (S && S.rabisco) fecharRabisco();
     if (S && S.arraste) { S.arraste = null; atualizarPainelSelecao(); }
   })
 );
+
+/**
+ * Fecha o traço em andamento e vira camada.
+ *
+ * O histórico é gravado aqui, no fim, e não no começo do traço: gravar antes
+ * significaria um estado a desfazer por pincelada mesmo quando a pessoa só
+ * encostou e não desenhou nada.
+ */
+function fecharRabisco() {
+  const pontos = S.rabisco.pontos;
+  S.rabisco = null;
+  if (!pontos.length) { draw(); return; }
+
+  pushHistory();
+  const traco = L.novoRabisco(pontos, rabiscoCor, espessuraNaImagem());
+  S.layers.push(traco);
+  // Seleciona o traço recém-feito para as alças e o botão de excluir
+  // aparecerem na hora, sem precisar caçar o traço depois.
+  selecionar(traco);
+}
 
 el.canvas.addEventListener('pointerdown', (e) => {
   if (!S || S.tool !== 'brush') return;
@@ -789,6 +856,63 @@ el.inverter.addEventListener('change', () => {
     draw();
   });
 })();
+
+/* ------------------------------------------------------------------ *
+ * Rabiscar à mão livre
+ * ------------------------------------------------------------------ */
+function modoMoverRabisco() {
+  return !!($('rabMover') && $('rabMover').checked);
+}
+
+if ($('rabMover')) {
+  $('rabMover').addEventListener('change', () => {
+    el.stage.classList.toggle('tool-rabisco', S && S.tool === 'rabisco' && !modoMoverRabisco());
+  });
+}
+
+function marcarCorDoRabisco() {
+  if (!$('rabPaleta')) return;
+  for (const b of $('rabPaleta').children) {
+    b.classList.toggle('is-active', b.dataset.cor === rabiscoCor);
+  }
+}
+
+if ($('rabCor')) {
+  $('rabCor').addEventListener('input', () => {
+    rabiscoCor = $('rabCor').value;
+    marcarCorDoRabisco();
+  });
+}
+
+if ($('rabEspessura')) {
+  $('rabEspessura').addEventListener('input', () => {
+    rabiscoEspessura = Number($('rabEspessura').value);
+    $('rabEspessuraVal').textContent = rabiscoEspessura + 'px';
+  });
+}
+
+if ($('rabPaleta')) {
+  $('rabPaleta').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cor]');
+    if (!b) return;
+    rabiscoCor = b.dataset.cor;
+    $('rabCor').value = rabiscoCor;
+    marcarCorDoRabisco();
+  });
+  marcarCorDoRabisco();
+}
+
+if ($('rabLimpar')) {
+  $('rabLimpar').addEventListener('click', () => {
+    if (!S) return;
+    const sobra = S.layers.filter((l) => l.tipo !== 'rabisco');
+    if (sobra.length === S.layers.length) return;   // nada a apagar
+    pushHistory();
+    S.layers = sobra;
+    if (S.sel && S.sel.tipo === 'rabisco') selecionar(null);
+    else draw();
+  });
+}
 
 /* ------------------------------------------------------------------ *
  * Marca d'água — VIP
@@ -1234,7 +1358,10 @@ function atualizarPainelSelecao() {
   el.propsForma.hidden = !(l && l.tipo === 'forma');
   if (!l) return;
 
-  el.selNome.textContent = l.tipo === 'texto' ? 'Texto' : l.tipo === 'forma' ? 'Forma' : 'Imagem';
+  el.selNome.textContent =
+    l.tipo === 'texto' ? 'Texto' :
+    l.tipo === 'forma' ? 'Forma' :
+    l.tipo === 'rabisco' ? 'Rabisco' : 'Imagem';
   el.selOpacidade.value = Math.round(l.opacity * 100);
   el.selOpacidadeVal.textContent = Math.round(l.opacity * 100) + '%';
 

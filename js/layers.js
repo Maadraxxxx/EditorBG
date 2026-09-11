@@ -73,6 +73,80 @@ export function novaImagem(bitmap, cx, cy, larguraAlvo) {
   return Object.assign(l, { tipo: 'imagem', bitmap });
 }
 
+/**
+ * Rabisco à mão livre. Cada traço é uma camada inteira — não tinta carimbada
+ * na foto — então dá para mover, girar, mudar a opacidade, mandar para trás e
+ * apagar um traço sozinho depois de feito, em vez de só desfazer o último.
+ *
+ * Os pontos ficam guardados em relação ao CENTRO da camada, e não em
+ * coordenadas da imagem: assim arrastar a camada leva o traço junto sem
+ * precisar recalcular ponto por ponto.
+ */
+export function novoRabisco(pontos, cor, espessura) {
+  const margem = espessura / 2 + 1;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of pontos) {
+    if (p.x < x0) x0 = p.x;
+    if (p.x > x1) x1 = p.x;
+    if (p.y < y0) y0 = p.y;
+    if (p.y > y1) y1 = p.y;
+  }
+  x0 -= margem; y0 -= margem; x1 += margem; y1 += margem;
+
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const w = Math.max(1, x1 - x0);
+  const h = Math.max(1, y1 - y0);
+
+  const l = base(w, h, cx, cy);
+  return Object.assign(l, {
+    tipo: 'rabisco',
+    pontos: pontos.map((p) => ({ x: p.x - cx, y: p.y - cy })),
+    // Tamanho de origem: sem ele, puxar uma alça aumentaria a caixa e deixaria
+    // o traço do tamanho antigo parado dentro dela.
+    w0: w,
+    h0: h,
+    cor,
+    espessura,
+  });
+}
+
+/**
+ * Liga os pontos por curvas passando pelo meio de cada par. Com lineTo puro o
+ * traço sai facetado nas curvas — o mouse entrega pontos espaçados, e escrever
+ * um nome cursivo vira um polígono.
+ */
+function tracar(ctx, pts) {
+  ctx.beginPath();
+  if (pts.length < 2) {
+    // Um clique sem arrastar ainda deve deixar um pingo visível.
+    ctx.moveTo(pts[0].x, pts[0].y);
+    ctx.lineTo(pts[0].x + 0.01, pts[0].y);
+    return;
+  }
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length - 1; i++) {
+    ctx.quadraticCurveTo(
+      pts[i].x, pts[i].y,
+      (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2,
+    );
+  }
+  ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+}
+
+/** Desenha um traço solto, sem camada — serve para o que está sendo rabiscado agora. */
+export function desenharTraco(ctx, pontos, cor, espessura) {
+  if (!pontos || !pontos.length) return;
+  ctx.save();
+  ctx.strokeStyle = cor;
+  ctx.lineWidth = espessura;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  tracar(ctx, pontos);
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function duplicar(layer, deslocamento) {
   return { ...layer, id: ++idSeq, x: layer.x + deslocamento, y: layer.y + deslocamento };
 }
@@ -200,6 +274,16 @@ export function desenharCamada(ctx, l) {
 
   if (l.tipo === 'imagem') {
     ctx.drawImage(l.bitmap, -l.w / 2, -l.h / 2, l.w, l.h);
+  } else if (l.tipo === 'rabisco') {
+    // A escala vem da razão com o tamanho de origem, então puxar uma alça
+    // estica o traço e a espessura junto, como esticar um desenho no papel.
+    ctx.scale(l.w / l.w0, l.h / l.h0);
+    ctx.strokeStyle = l.cor;
+    ctx.lineWidth = l.espessura;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    tracar(ctx, l.pontos);
+    ctx.stroke();
   } else if (l.tipo === 'forma') {
     caminho(ctx, l);
     ctx.fillStyle = l.fill;
