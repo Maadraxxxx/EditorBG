@@ -188,7 +188,7 @@ function comSombra(cut, { x, y, desfoque, opacidade, cor }) {
  * claro simplesmente desaparece, que é o único caso em que ela precisava estar
  * visível.
  */
-function desenharMarca(canvas, marca) {
+export function desenharMarca(canvas, marca) {
   const texto = String(marca.texto || '').trim();
   if (!texto || marca.opacidade <= 0) return canvas;
 

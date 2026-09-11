@@ -5,7 +5,7 @@
  * então pincelar continua fluido mesmo numa foto de 3000px. A resolução cheia
  * só é usada no "Aplicar", pelo compose() da galeria.
  */
-import { geometry, drawCutout, fonteAjustada, cloneCanvas, defaultEdit } from './compose.js';
+import { geometry, drawCutout, fonteAjustada, cloneCanvas, defaultEdit, desenharMarca } from './compose.js';
 import { ajustesPadrao, FILTROS, aplicarFiltro } from './adjust.js';
 import * as L from './layers.js';
 import { refreshSliders } from './sliders.js';
@@ -292,6 +292,11 @@ function scheduleDraw() {
   requestAnimationFrame(() => { rafPending = false; draw(); });
 }
 
+/* Só esconde a marca da prévia, para enxergar a foto por baixo enquanto se
+   trabalha. De propósito fora de S.edit: é preferência de quem olha, não parte
+   da edição — o arquivo baixado continua saindo com a marca. */
+let marcaOculta = false;
+
 function draw() {
   if (!S) return;
   const g = geom();
@@ -324,6 +329,22 @@ function draw() {
     ctx.setTransform(m);
     L.desenharCamadas(ctx, S.layers);
     ctx.restore();
+  }
+
+  // A marca aparece na tela igual ao que vai sair no arquivo. Ela é desenhada
+  // num canvas do tamanho que o recorte final ocupa NA TELA, não em resolução
+  // cheia: como o tamanho da marca é uma fração do lado menor, a proporção sai
+  // idêntica e não se cria um canvas de milhares de pixels a cada pincelada.
+  //
+  // A posição parte do canto do recorte porque a prévia mostra a caixa inteira
+  // — o recorte ali é só uma moldura, mas no arquivo é o que sobra.
+  if (S.edit.marca && !marcaOculta) {
+    const c = S.edit.crop || { x: 0, y: 0 };
+    const alvo = document.createElement('canvas');
+    alvo.width = Math.max(1, Math.round(g.width * S.scaleX));
+    alvo.height = Math.max(1, Math.round(g.height * S.scaleY));
+    desenharMarca(alvo, S.edit.marca);
+    ctx.drawImage(alvo, Math.round(c.x * S.scaleX), Math.round(c.y * S.scaleY));
   }
 
   if (el.showMask.checked) {
@@ -817,6 +838,14 @@ for (const id of ['marcaTexto', 'marcaTamanho', 'marcaOpacidade', 'marcaRepetir'
     aplicarMarca();
   });
   el2.addEventListener('change', aplicarMarca);
+}
+
+if ($('marcaOcultar')) {
+  $('marcaOcultar').addEventListener('change', () => {
+    marcaOculta = $('marcaOcultar').checked;
+    $('marcaOcultaNota').hidden = !marcaOculta;
+    draw();
+  });
 }
 
 if ($('marcaPosicao')) {

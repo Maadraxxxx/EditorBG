@@ -21,7 +21,7 @@
 
   <link rel="stylesheet" href="css/style.css" />
 </head>
-<body>
+<body data-mode="melhorar">
 
 <header class="topbar">
   <a class="brand" href="/" title="Voltar para o início">
@@ -85,6 +85,9 @@
         <span class="mq-medidas" id="medidas">—</span>
       </div>
 
+      <!-- Só esta faixa rola quando a tela é baixa: os botões de baixar
+           ficam presos embaixo, sempre à vista. -->
+      <div class="mq-rolagem">
       <!-- Perfis: grátis. Equilíbrio de cor: VIP. -->
       <div class="mq-bloco">
         <span class="mq-titulo">Tipo de foto</span>
@@ -127,6 +130,7 @@
         <div class="mq-barra" id="iaBarra" hidden><div id="iaPreenche"></div></div>
         <p class="mq-nota" id="iaEstado" hidden></p>
         <button class="link-botao" id="cancelarIA" hidden>Cancelar</button>
+      </div>
       </div>
 
       <p class="hd-aviso" id="aviso"></p>
