@@ -100,8 +100,81 @@ export function outputSize(bitmapW, bitmapH, edit) {
   return { w: g.width, h: g.height };
 }
 
+/* ------------------------------------------------------------------ *
+ * Contorno e sombra
+ * ------------------------------------------------------------------ *
+ * Os dois partem da mesma coisa: a SILHUETA do recorte, que é a forma dele
+ * preenchida de uma cor só. Com ela dá para desenhar tanto uma borda quanto
+ * uma sombra sem precisar saber nada sobre a imagem por dentro.
+ */
+
+/** A forma do recorte, chapada numa cor. */
+function silhueta(fonte, cor) {
+  const c = document.createElement('canvas');
+  c.width = fonte.width;
+  c.height = fonte.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(fonte, 0, 0);
+  // `source-in` pinta só onde já havia pixel — ou seja, dentro da forma.
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = cor;
+  ctx.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+
+/**
+ * Borda em volta do recorte, estilo adesivo.
+ *
+ * Feita carimbando a silhueta deslocada em círculo em vez de com um algoritmo
+ * de dilatação: o resultado é o mesmo e o canvas faz o trabalho pesado. O
+ * número de carimbos acompanha a largura — poucos passos numa borda grossa
+ * deixariam o contorno com cantos de estrela em vez de redondo.
+ */
+function comContorno(cut, { largura, cor }) {
+  if (!largura) return cut;
+
+  const forma = silhueta(cut, cor);
+  const out = document.createElement('canvas');
+  out.width = cut.width;
+  out.height = cut.height;
+  const ctx = out.getContext('2d');
+
+  const passos = Math.max(16, Math.round(largura * 5));
+  for (let i = 0; i < passos; i++) {
+    const a = (i / passos) * Math.PI * 2;
+    ctx.drawImage(forma, Math.cos(a) * largura, Math.sin(a) * largura);
+  }
+
+  ctx.drawImage(cut, 0, 0);
+  return out;
+}
+
+/**
+ * Sombra projetada.
+ *
+ * Vem DEPOIS do contorno de propósito: a sombra é da silhueta já com a borda,
+ * como aconteceria de verdade. Aplicada antes, o contorno ficaria flutuando
+ * sobre a própria sombra.
+ */
+function comSombra(cut, { x, y, desfoque, opacidade, cor }) {
+  const forma = silhueta(cut, cor);
+  const out = document.createElement('canvas');
+  out.width = cut.width;
+  out.height = cut.height;
+  const ctx = out.getContext('2d');
+
+  ctx.globalAlpha = opacidade;
+  ctx.filter = 'blur(' + desfoque + 'px)';
+  ctx.drawImage(forma, x, y);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+
+  ctx.drawImage(cut, 0, 0);
+  return out;
+}
+
 /** Render final, em resolução cheia. */
-export function compose(item, { background, feather }) {
+export function compose(item, { background, feather, contorno, sombra }) {
   const g = geometry(item.bitmap.width, item.bitmap.height, item.edit);
 
   let cut = document.createElement('canvas');
@@ -137,6 +210,11 @@ export function compose(item, { background, feather }) {
     sctx.drawImage(cut, 0, 0, size.w, size.h);
     cut = scaled;
   }
+
+  // Contorno antes da sombra: a sombra é projetada pela silhueta já com a
+  // borda, como aconteceria se o adesivo existisse de verdade.
+  if (contorno && contorno.largura > 0) cut = comContorno(cut, contorno);
+  if (sombra && sombra.opacidade > 0) cut = comSombra(cut, sombra);
 
   if (background === 'transparent') return cut;
 

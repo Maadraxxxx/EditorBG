@@ -123,6 +123,32 @@
       <input type="range" id="feather" min="0" max="6" step="1" value="0" />
     </div>
 
+    <!-- Contorno: grátis. Sombra: VIP. A diferença está escrita no rótulo,
+         não escondida atrás de um clique que dá erro. -->
+    <div class="tool-group">
+      <label class="tool-label">Contorno <span class="val" id="contornoVal">0px</span></label>
+      <input type="range" id="contorno" min="0" max="24" step="1" value="0" />
+      <div class="fx-cores" id="contornoCores">
+        <button class="fx-cor is-active" data-cor="#ffffff" style="--c:#ffffff" title="Branco"></button>
+        <button class="fx-cor" data-cor="#000000" style="--c:#000000" title="Preto"></button>
+        <button class="fx-cor" data-cor="#f43f5e" style="--c:#f43f5e" title="Vermelho"></button>
+        <button class="fx-cor" data-cor="#22c55e" style="--c:#22c55e" title="Verde"></button>
+        <label class="fx-cor fx-cor-livre" title="Escolher cor">
+          <span id="contornoSwatch" style="--c:#6366f1"></span>
+          <input type="color" id="contornoCorLivre" value="#6366f1" />
+        </label>
+      </div>
+    </div>
+
+    <div class="tool-group" id="grupoSombra">
+      <label class="tool-label">Sombra <span class="selo-vip">VIP</span> <span class="val" id="sombraVal">desligada</span></label>
+      <input type="range" id="sombra" min="0" max="80" step="1" value="0" />
+      <div class="fx-linha">
+        <label class="fx-mini">Distância <input type="range" id="sombraDist" min="0" max="60" step="1" value="14" /></label>
+        <label class="fx-mini">Suavidade <input type="range" id="sombraBlur" min="0" max="60" step="1" value="18" /></label>
+      </div>
+    </div>
+
     <div class="tool-actions">
       <button class="btn ghost" id="clearBtn">Limpar tudo</button>
       <button class="btn hd" id="downloadHDBtn" title="Resolução original">

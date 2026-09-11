@@ -2137,3 +2137,42 @@ body[data-mode="editor"] .conteudo {
 .btn-google:active { transform: translateY(0) scale(.99); }
 .btn-google:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn-google svg { flex: none; }
+
+/* ------------------------------------------------------------------ *
+ * Contorno e sombra na barra de ferramentas
+ * ------------------------------------------------------------------ */
+.fx-cores { display: flex; gap: 6px; margin-top: 8px; }
+
+.fx-cor {
+  width: 24px; height: 24px;
+  border-radius: 8px;
+  border: 2px solid var(--line);
+  background: var(--c);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: border-color .15s, transform .14s;
+}
+.fx-cor:hover { transform: translateY(-1px); border-color: var(--line-forte); }
+.fx-cor.is-active { border-color: var(--accent); }
+.fx-cor:focus-within { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* O seletor livre é um <label> com o input de cor escondido dentro. */
+.fx-cor-livre { display: grid; place-items: center; overflow: hidden; background: none; }
+.fx-cor-livre span {
+  width: 100%; height: 100%;
+  border-radius: 6px;
+  background:
+    conic-gradient(from .25turn, #f43f5e, #fbbf24, #22c55e, #22d3ee, #6366f1, #f43f5e);
+}
+.fx-cor-livre input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.fx-linha { display: flex; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.fx-mini {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1 1 120px;
+  min-width: 0;
+}

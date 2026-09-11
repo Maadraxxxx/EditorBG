@@ -48,6 +48,10 @@ const downloadHDBtn = $('downloadHDBtn');
 const items = [];           // { id, name, bitmap, maskCanvas, resultCanvas, els, status }
 let background = 'transparent';
 let feather = 0;
+
+/* Efeitos sobre o recorte. Contorno é de todo mundo; sombra é do VIP. */
+let contorno = { largura: 0, cor: '#ffffff' };
+let sombra = { opacidade: 0, x: 10, y: 10, desfoque: 18, cor: '#000000' };
 let queue = Promise.resolve();
 let modelPromise = null;
 let loadedKey = null;
@@ -426,7 +430,7 @@ async function downscaleIfNeeded(bitmap) {
 function render(item) {
   if (!item.maskCanvas) return Promise.resolve();
 
-  const final = compose(item, { background, feather });
+  const final = compose(item, { background, feather, contorno, sombra });
   item.resultCanvas = final;
   return new Promise((resolve) => {
     final.toBlob((blob) => {
@@ -466,6 +470,85 @@ featherInput.addEventListener('input', () => {
   feather = Number(featherInput.value);
   featherVal.textContent = feather + 'px';
   renderAll();
+});
+
+/* ------------------------------------------------------------------ *
+ * Contorno (grátis) e sombra (VIP)
+ * ------------------------------------------------------------------ */
+$('contorno').addEventListener('input', () => {
+  contorno.largura = Number($('contorno').value);
+  $('contornoVal').textContent = contorno.largura + 'px';
+  renderAll();
+});
+
+$('contornoCores').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-cor]');
+  if (!b) return;
+  contorno.cor = b.dataset.cor;
+  marcarCor(b);
+  renderAll();
+});
+
+$('contornoCorLivre').addEventListener('input', () => {
+  contorno.cor = $('contornoCorLivre').value;
+  $('contornoSwatch').style.setProperty('--c', contorno.cor);
+  marcarCor($('contornoCorLivre').closest('.fx-cor'));
+  renderAll();
+});
+
+function marcarCor(alvo) {
+  for (const b of $('contornoCores').children) b.classList.toggle('is-active', b === alvo);
+}
+
+/**
+ * A sombra é VIP. O slider não fica desabilitado de propósito: mexer nele é
+ * como a pessoa descobre que o recurso existe. Ele volta para zero e a tela de
+ * planos abre explicando — melhor do que um controle morto sem motivo escrito.
+ */
+function sombraLiberada() {
+  if (temHD()) return true;
+  $('sombra').value = 0;
+  sombra.opacidade = 0;
+  $('sombraVal').textContent = 'desligada';
+  abrirPaywall(null, null);
+  return false;
+}
+
+$('sombra').addEventListener('input', () => {
+  if (!sombraLiberada()) return;
+  sombra.opacidade = Number($('sombra').value) / 100;
+  $('sombraVal').textContent = sombra.opacidade
+    ? Math.round(sombra.opacidade * 100) + '%'
+    : 'desligada';
+  renderAll();
+});
+
+for (const [id, campo] of [['sombraDist', 'dist'], ['sombraBlur', 'desfoque']]) {
+  $(id).addEventListener('input', () => {
+    if (!sombraLiberada()) return;
+    const v = Number($(id).value);
+    if (campo === 'dist') {
+      // Uma distância só, projetada na diagonal: duas entradas (x e y) seriam
+      // precisão que ninguém quer ajustar para uma sombra de produto.
+      sombra.x = Math.round(v * 0.7);
+      sombra.y = Math.round(v * 0.7);
+    } else {
+      sombra.desfoque = v;
+    }
+    renderAll();
+  });
+}
+
+// Perder o plano no meio do caminho desliga a sombra em vez de deixá-la
+// funcionando de graça.
+Conta.aoMudar(() => {
+  if (!temHD() && sombra.opacidade > 0) {
+    sombra.opacidade = 0;
+    $('sombra').value = 0;
+    $('sombraVal').textContent = 'desligada';
+    refreshSliders();
+    renderAll();
+  }
 });
 
 clearBtn.addEventListener('click', () => {
