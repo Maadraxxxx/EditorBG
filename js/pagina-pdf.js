@@ -636,11 +636,14 @@ const FERRAMENTAS = [
     sobre: 'Traduz o texto do documento. A tradução roda no seu aparelho.',
     icone: 'traduzir',
     aceita: 'application/pdf',
-    aviso: 'Funciona em qualquer navegador. Se o seu tiver tradutor embutido, a tradução '
-      + 'é instantânea; se não tiver, o site baixa um modelo de tradução de cerca de 400 MB '
-      + 'na PRIMEIRA vez — depois ele fica guardado e funciona até sem internet. Em '
-      + 'qualquer um dos dois casos o documento não sai do seu aparelho. Sai o texto '
+    aviso: 'Funciona em qualquer navegador, mas de dois jeitos diferentes. Se o seu tiver '
+      + 'tradutor embutido (Chrome novo), traduz para qualquer idioma, na hora, sem baixar '
+      + 'nada. Se não tiver, o site baixa um modelo de cerca de ' + PDF.PESO_DO_TRADUTOR
+      + ' MB na primeira vez, que traduz de vários idiomas PARA O INGLÊS — e só. Um modelo '
+      + 'que traduza para qualquer idioma pesaria mais de 600 MB a cada uso, grande demais '
+      + 'para valer a pena. Nos dois casos o documento não sai do seu aparelho: sai o texto '
       + 'traduzido, não o PDF original com as palavras trocadas de lugar.',
+    preparar: avisarPesoDoTradutor,
     controles: () => seletor('de', 'Idioma do documento', PDF.IDIOMAS)
       + seletor('para', 'Traduzir para', PDF.IDIOMAS.slice().reverse())
       + seletor('saida', 'O que baixar', [['pdf', 'PDF'], ['txt', 'Texto (.txt)']]),
@@ -652,8 +655,8 @@ const FERRAMENTAS = [
         (f, fase, feito, total) => {
           aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
           if (fase === 'baixando') {
-          dizer('Baixando o modelo de tradução — só desta vez, cerca de 400 MB. '
-            + 'Depois ele fica guardado no navegador.');
+          dizer('Baixando o modelo de tradução — só desta vez, cerca de '
+            + PDF.PESO_DO_TRADUTOR + ' MB. Depois ele fica guardado no navegador.');
         }
           else if (fase === 'traduzindo') dizer('Traduzindo o trecho ' + feito + ' de ' + total + '…');
         });
@@ -953,6 +956,9 @@ function abrir(f) {
   $('estado').hidden = true;
   $('barra').hidden = true;
   $('executar').disabled = false;
+  // A tradução troca o rótulo para avisar do download; sem zerar aqui o aviso
+  // ficaria colado na próxima ferramenta aberta.
+  $('executar').textContent = 'Fazer agora';
 
   // Depois de zerar o botão, nunca antes: a montagem da câmera o desabilita até
   // existir a primeira foto, e o reset acima desfaria isso.
@@ -1941,4 +1947,23 @@ function desligarCamera() {
   if (!camera) return;
   for (const faixa of camera.getTracks()) faixa.stop();
   camera = null;
+}
+
+
+/**
+ * Escreve no próprio botão quanto vai ser baixado, quando for o caso.
+ *
+ * O aviso em texto some no meio dos outros; o rótulo do botão é a última coisa
+ * que a pessoa lê antes de clicar. E some sozinho depois da primeira vez,
+ * porque aí não há mais download nenhum para avisar.
+ */
+async function avisarPesoDoTradutor() {
+  const botao = $('executar');
+  if (!botao) return;
+  botao.textContent = 'Fazer agora';
+
+  if ('Translator' in self) return;              // o navegador traduz sozinho
+  if (await PDF.tradutorJaBaixado()) return;     // já está guardado aqui
+
+  botao.textContent = 'Baixar o modelo (' + PDF.PESO_DO_TRADUTOR + ' MB) e traduzir';
 }

@@ -1446,6 +1446,11 @@ function emPedacos(texto, teto = 3500) {
 
 
 /** Idiomas oferecidos. A lista é curta de propósito: são os pares que o modelo local cobre bem. */
+const NOMES_DE_IDIOMA = {
+  pt: 'português', en: 'inglês', es: 'espanhol',
+  fr: 'francês', de: 'alemão', it: 'italiano', ja: 'japonês',
+};
+
 export const IDIOMAS = [
   ['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'],
   ['fr', 'Francês'], ['de', 'Alemão'], ['it', 'Italiano'], ['ja', 'Japonês'],
@@ -2072,17 +2077,42 @@ export function resumirTexto(texto, opcoes = {}) {
  * ------------------------------------------------------------------ */
 
 
+/**
+ * O modelo de tradução já está guardado neste navegador?
+ *
+ * O transformers.js guarda os arquivos no cache do navegador. Perguntar antes
+ * evita ameaçar com um download de 600 MB quem já baixou — e, principalmente,
+ * evita NÃO avisar quem ainda não baixou.
+ */
+export async function tradutorJaBaixado() {
+  try {
+    if (typeof caches === 'undefined') return false;
+    const c = await caches.open('transformers-cache');
+    const chaves = await c.keys();
+    return chaves.some((r) => r.url.includes('opus-mt-mul-en') && r.url.includes('.onnx'));
+  } catch {
+    return false;
+  }
+}
+
+/** Quanto o modelo pesa, em MB. Medido nos arquivos que o dtype q8 baixa. */
+export const PESO_DO_TRADUTOR = 110;
+
 let tradutorPromise = null;
 let tradutorCarregado = null;
 
 /**
- * Carrega o modelo de tradução que roda no navegador, em WebAssembly.
+ * Carrega o modelo de tradução que roda no navegador.
  *
- * Este é o caminho que funciona em qualquer navegador — Chrome, Firefox, Safari
- * ou Edge — e não só no que tem IA embutida. O preço está escrito na tela antes
- * de começar: são centenas de megabytes na PRIMEIRA vez, que ficam guardados
- * depois. A alternativa seria mandar o documento para um servidor traduzir, que
- * é exatamente o que este site não faz.
+ * É o `opus-mt-mul-en`, e a escolha dele veio de medição, não de gosto: o
+ * modelo que traduz para QUALQUER idioma pesa 603 MB, e eu vi esse arquivo não
+ * ser gravado no cache do navegador — ou seja, seriam 603 MB a cada uso, não
+ * uma vez. Prometer "baixa uma vez e fica guardado" sobre um arquivo que não
+ * fica guardado seria mentira.
+ *
+ * Este pesa 107 MB, cabe no cache com folga e traduz de muitos idiomas PARA O
+ * INGLÊS. É menos do que se queria, mas é o que funciona de verdade — e a tela
+ * diz exatamente isso em vez de oferecer destinos que não vai entregar.
  */
 async function modeloDeTraducao(aoProgredir) {
   if (tradutorCarregado) return tradutorCarregado;
@@ -2091,11 +2121,10 @@ async function modeloDeTraducao(aoProgredir) {
       const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1');
       env.allowLocalModels = false;
 
-      // Processador e não placa de vídeo, de propósito: este modelo tem 400 MB e
-      // a versão em GPU não terminou de carregar nos testes daqui. Entre um
-      // caminho medido e funcionando e outro que talvez seja mais rápido mas
-      // trava, vale o que funciona.
-      const p = await pipeline('translation', 'Xenova/m2m100_418M', {
+      // Processador e não placa de vídeo: o caminho da GPU não terminou de
+      // carregar em nenhum teste daqui. Entre um caminho medido e funcionando e
+      // outro que talvez seja mais rápido mas trava, vale o que funciona.
+      const p = await pipeline('translation', 'Xenova/opus-mt-mul-en', {
         device: 'wasm',
         dtype: 'q8',
         progress_callback: (e) => {
@@ -2159,6 +2188,19 @@ export async function traduzir(texto, de, para, aoProgredir = () => {}) {
     }
   }
 
+  // Sem tradutor embutido sobra o modelo local, e ele só traduz PARA o inglês.
+  // Esta recusa não é burocracia: pedindo outro destino ele NÃO falha — ele
+  // inventa. "Hello world, this is a test of the system" pedido para português
+  // voltou como "Helgore, this is a tip of the system and it is also a hat".
+  // Um resultado errado com cara de certo é pior do que recusa nenhuma.
+  if (para !== 'en') {
+    throw new Error('Este navegador não tem tradutor embutido, e o modelo que roda aqui '
+      + 'dentro só traduz PARA o inglês. Traduzir para ' + (NOMES_DE_IDIOMA[para] || para)
+      + ' exigiria baixar mais de 600 MB a cada uso, porque um arquivo desse tamanho não '
+      + 'fica guardado no navegador. Escolha inglês como destino, ou use um navegador com '
+      + 'tradutor próprio.');
+  }
+
   aoProgredir(0, 'baixando');
   const modelo = await modeloDeTraducao((f) => aoProgredir(f, 'baixando'));
 
@@ -2168,7 +2210,7 @@ export async function traduzir(texto, de, para, aoProgredir = () => {}) {
     const frases = emFrases(pedacos[i]);
     const traduzidas = [];
     for (const frase of (frases.length ? frases : [pedacos[i]])) {
-      const r = await modelo(frase, { src_lang: de, tgt_lang: para });
+      const r = await modelo(frase);
       traduzidas.push((r[0] && r[0].translation_text) || '');
     }
     saida.push(traduzidas.join(' '));
