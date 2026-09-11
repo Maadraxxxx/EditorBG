@@ -280,7 +280,23 @@ function semCota(limite) {
 /* ------------------------------------------------------------------ *
  * Ampliação com IA
  * ------------------------------------------------------------------ */
+/**
+ * A ampliação por IA não existe no celular.
+ *
+ * Não é excesso de zelo: uma foto de 1600px são 63 ladrilhos, perto de um
+ * quarto de hora de conta sem parar. A tela bloqueia ou a pessoa troca de
+ * aplicativo, e o iPhone descarta a aba — a página recarrega sozinha e o
+ * trabalho todo se perde. Mostrar um botão que quase sempre termina assim é
+ * pior do que não ter o botão: promete uma coisa que o aparelho não entrega.
+ *
+ * O resto da página funciona igual no celular; o que sai é só esta parte.
+ */
+const IA_DISPONIVEL = !ehCelular;
+if (!IA_DISPONIVEL && $('blocoIA')) $('blocoIA').hidden = true;
+
 function prepararIA() {
+  if (!IA_DISPONIVEL) return;
+
   const segundos = M.estimarSegundos(original.width, original.height, motor);
   const nota = $('iaNota');
 
@@ -309,13 +325,8 @@ function prepararIA() {
   nota.textContent =
     'Vai de ' + original.width + '×' + original.height + ' para '
     + (original.width * 2) + '×' + (original.height * 2) + '. '
-    + 'Nesta imagem leva ' + M.tempoEscrito(segundos)
-    + (ehCelular ? ', rodando no SEU aparelho — ' : ', rodando no SEU computador — ')
-    // No celular não basta deixar a aba aberta: trocar de aplicativo congela a
-    // página, e no iPhone o sistema chega a descartar a aba inteira.
-    + (ehCelular
-      ? 'mantenha a tela ligada e não troque de aplicativo.'
-      : 'a aba precisa ficar aberta.');
+    + 'Nesta imagem leva ' + M.tempoEscrito(segundos) + ', rodando no SEU computador — '
+    + 'a aba precisa ficar aberta.';
 
   // Acima de dois minutos o aviso deixa de ser informação e passa a ser
   // decisão: quem não souber quanto tempo vai esperar, desiste no meio.
@@ -361,25 +372,14 @@ function confirmarDemora(segundos) {
 }
 
 let cancelar = false;
-let motivoParada = null;   // por que parou, quando não foi a pessoa que cancelou
-
-/**
- * Teto de espera no celular, em segundos.
- *
- * Oito minutos não é um número de conforto: é quanto o aparelho aguenta. Com a
- * tela acesa e o processador no talo o celular esquenta, o sistema reduz a
- * velocidade e, no iPhone, acaba descartando a aba — a página recarrega
- * sozinha e o trabalho todo se perde sem explicação nenhuma.
- */
-const LIMITE_CELULAR = 8 * 60;
 
 /**
  * Impede a tela de apagar enquanto a IA trabalha.
  *
- * É a causa mais provável de a conta nunca terminar no celular: a tela apaga,
- * o sistema congela a aba e, no iPhone, chega a descartá-la. Devolve sempre uma
- * função de soltar, mesmo quando o navegador não tem o recurso, para quem chama
- * não precisar verificar nada.
+ * Mesmo no computador a conta leva minutos, e uma máquina que adormece no meio
+ * deixa a pessoa voltando para uma barra parada. Devolve sempre uma função de
+ * soltar, mesmo quando o navegador não tem o recurso, para quem chama não
+ * precisar verificar nada.
  */
 async function segurarTela() {
   if (!('wakeLock' in navigator)) return () => {};
@@ -389,21 +389,6 @@ async function segurarTela() {
   } catch {
     return () => {};
   }
-}
-
-/**
- * Sair da aba no meio congela a conta. Parar com explicação é melhor do que
- * a pessoa voltar minutos depois e encontrar uma barra de progresso parada
- * sem saber se ainda está viva.
- */
-function pararSeSumir() {
-  // Só no celular. No computador trocar de aba não interrompe nada — o Worker
-  // continua trabalhando — e cancelar ali jogaria fora minutos de conta por
-  // causa de um perigo que não existe naquela máquina.
-  if (!ehCelular || !document.hidden) return;
-  motivoParada = 'você saiu da aba, e o celular congela a conta quando isso '
-    + 'acontece. Toque de novo para recomeçar, sem trocar de aplicativo.';
-  cancelar = true;
 }
 
 $('botaoIA').addEventListener('click', async () => {
@@ -417,7 +402,6 @@ $('botaoIA').addEventListener('click', async () => {
   if (segundos > 120 && !(await confirmarDemora(segundos))) return;
 
   cancelar = false;
-  motivoParada = null;
   botao.disabled = true;
   $('cancelarIA').hidden = false;
   $('iaBarra').hidden = false;
@@ -425,7 +409,6 @@ $('botaoIA').addEventListener('click', async () => {
 
   const comecou = Date.now();
   const solta = await segurarTela();
-  document.addEventListener('visibilitychange', pararSeSumir);
 
   try {
     const dobrado = await M.comIA(original, (fase, fracao, info) => {
@@ -451,23 +434,7 @@ $('botaoIA').addEventListener('click', async () => {
       // Estimativa que se corrige sozinha: depois do primeiro pedaço já dá para
       // medir o ritmo desta máquina em vez de repetir o número teórico.
       const decorrido = (Date.now() - comecou) / 1000;
-      const porPedaco = decorrido / info.feitos;
-      const faltam = Math.round(porPedaco * (info.total - info.feitos));
-
-      // Freio de mão do celular. O número teórico vem de um computador; o ritmo
-      // real do aparelho só aparece no primeiro pedaço. Se a projeção passar do
-      // limite, parar agora é melhor do que deixar a pessoa esperar dez minutos
-      // de tela acesa para o sistema matar a aba no fim — que foi exatamente o
-      // que aconteceu no iPhone.
-      if (ehCelular && info.feitos === 1 && porPedaco * info.total > LIMITE_CELULAR) {
-        motivoParada = 'longo demais para este aparelho: seriam '
-          + M.tempoEscrito(Math.round(porPedaco * info.total))
-          + ' de tela acesa, e o celular desiste antes disso. '
-          + 'Funciona com uma foto menor, ou no computador.';
-        cancelar = true;
-        return;
-      }
-
+      const faltam = Math.round(decorrido / info.feitos * (info.total - info.feitos));
       $('iaEstado').textContent =
         'Pedaço ' + info.feitos + ' de ' + info.total
         + ' · faltam ' + M.tempoEscrito(faltam);
@@ -485,16 +452,13 @@ $('botaoIA').addEventListener('click', async () => {
     $('iaBarra').hidden = true;
     $('cancelarIA').hidden = true;
   } catch (err) {
-    $('iaEstado').textContent = err.message !== 'cancelado'
-      ? err.message
-      : motivoParada
-        ? 'Parado: ' + motivoParada
-        : 'Cancelado. A imagem continua como estava.';
+    $('iaEstado').textContent = err.message === 'cancelado'
+      ? 'Cancelado. A imagem continua como estava.'
+      : err.message;
     $('iaBarra').hidden = true;
     $('cancelarIA').hidden = true;
     botao.disabled = false;
   } finally {
-    document.removeEventListener('visibilitychange', pararSeSumir);
     solta();
   }
 });

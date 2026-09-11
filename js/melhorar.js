@@ -17,7 +17,6 @@
  * confirmada.
  */
 import { aplicarAjustes } from './adjust.js';
-import { ehCelular } from './limites.js';
 
 /* ------------------------------------------------------------------ *
  * Ladrilhos
@@ -57,19 +56,9 @@ const MARGEM = 16;
 const MS_POR_PIXEL = { wasm: 0.00032, webgpu: 0.000108 };
 const DESPERDICIO = ((LADRILHO + 2 * MARGEM) ** 2) / (LADRILHO ** 2);
 
-/**
- * Processador de celular é bem mais lento que o do computador onde os números
- * acima foram medidos. Três é um chute honesto, não uma medição — mas errar
- * para cima é o lado certo de errar: quem vê "2 minutos" e espera 6 desiste no
- * meio achando que travou. Assim que o primeiro pedaço termina, a tela passa a
- * mostrar o ritmo real do aparelho e este número deixa de importar.
- */
-const PESO_CELULAR = 3;
-
 export function estimarSegundos(largura, altura, dispositivo) {
   const porPixel = MS_POR_PIXEL[dispositivo] || MS_POR_PIXEL.wasm;
-  const peso = ehCelular ? PESO_CELULAR : 1;
-  return Math.max(5, Math.round(largura * altura * porPixel * DESPERDICIO * peso));
+  return Math.max(5, Math.round(largura * altura * porPixel * DESPERDICIO));
 }
 
 /**
