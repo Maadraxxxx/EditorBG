@@ -774,3 +774,108 @@ export async function ocr(arquivo, opcoes = {}, aoProgredir = () => {}) {
     await trabalhador.terminate();
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Senha e reparo — MuPDF
+ * ------------------------------------------------------------------ *
+ * Estas três operações mexem no arquivo num nível que o pdf-lib não alcança:
+ * criptografia de verdade e reconstrução de um arquivo quebrado. O MuPDF é uma
+ * biblioteca de PDF completa compilada para WebAssembly, então tudo continua
+ * acontecendo dentro do navegador.
+ *
+ * Ela é pesada — alguns megabytes — e por isso só é baixada quando uma destas
+ * três ferramentas é usada de fato.
+ */
+
+let muPromise = null;
+function mupdf() {
+  if (!muPromise) muPromise = import('https://cdn.jsdelivr.net/npm/mupdf@1.28.1/dist/mupdf.js');
+  return muPromise;
+}
+
+/** Abre pelo MuPDF, pedindo a senha quando o arquivo exigir. */
+async function abrirMu(arquivo, senha) {
+  const mu = await mupdf();
+  const doc = mu.PDFDocument.openDocument(new Uint8Array(await bytesDe(arquivo)), 'application/pdf');
+
+  if (doc.needsPassword()) {
+    if (!senha) {
+      const erro = new Error('Este PDF pede senha para abrir. Escreva a senha no campo acima.');
+      erro.pedeSenha = true;
+      throw erro;
+    }
+    if (!doc.authenticatePassword(senha)) {
+      const erro = new Error('Senha incorreta.');
+      erro.pedeSenha = true;
+      throw erro;
+    }
+  }
+  return { mu, doc };
+}
+
+/** O arquivo pede senha para ser aberto? A tela usa isso para mostrar o campo. */
+export async function pedeSenha(arquivo) {
+  try {
+    const mu = await mupdf();
+    const doc = mu.PDFDocument.openDocument(new Uint8Array(await bytesDe(arquivo)), 'application/pdf');
+    return doc.needsPassword();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fecha o PDF com senha, em AES-256.
+ *
+ * AES-256 e não RC4: o RC4 de 40 bits que muitos programas antigos ainda usam
+ * é quebrado em minutos por qualquer programa de recuperação. Uma senha que não
+ * segura ninguém é pior do que nenhuma, porque passa uma sensação de proteção
+ * que não existe.
+ *
+ * A mesma senha vai como "de usuário" e "de dono": senha de dono sozinha só
+ * restringe permissões, e qualquer leitor decente ignora — o arquivo abre
+ * normalmente. É a senha de usuário que realmente tranca.
+ */
+export async function proteger(arquivo, senha, senhaAtual) {
+  const limpa = String(senha || '').trim();
+  if (limpa.length < 4) throw new Error('A senha precisa de pelo menos 4 caracteres.');
+
+  const { doc } = await abrirMu(arquivo, senhaAtual);
+  const saida = doc.saveToBuffer(
+    'encrypt=aes-256,user-password=' + limpa + ',owner-password=' + limpa,
+  );
+  return comoPdf(saida.asUint8Array());
+}
+
+/**
+ * Tira a senha — de quem JÁ SABE a senha.
+ *
+ * Isto não quebra senha nenhuma: sem a senha certa o conteúdo é ilegível, e é
+ * assim que tem que ser. Serve para quem recebe todo mês o mesmo extrato
+ * trancado e quer guardar uma cópia aberta.
+ */
+export async function desbloquear(arquivo, senha) {
+  const { doc } = await abrirMu(arquivo, senha);
+  return comoPdf(doc.saveToBuffer('decrypt').asUint8Array());
+}
+
+/**
+ * Reconstrói um PDF quebrado.
+ *
+ * O defeito mais comum é a tabela de referências cruzadas — o índice que diz
+ * onde cada objeto começa — apontar para o lugar errado, o que acontece quando
+ * um download é interrompido ou um pendrive é retirado no meio da gravação. O
+ * MuPDF varre o arquivo inteiro atrás dos objetos e monta um índice novo.
+ *
+ * Não faz milagre: o que foi sobrescrito por zeros está perdido. Mas quase
+ * sempre o conteúdo está lá e só o índice se perdeu.
+ */
+export async function reparar(arquivo, senha) {
+  const { doc } = await abrirMu(arquivo, senha);
+  const paginas = doc.countPages();
+  if (!paginas) throw new Error('Não foi possível recuperar nenhuma página deste arquivo.');
+
+  // garbage=compact joga fora objeto órfão e reescreve o índice do zero.
+  const saida = doc.saveToBuffer('garbage=compact,compress').asUint8Array();
+  return { blob: comoPdf(saida), paginas, bytes: saida.length };
+}

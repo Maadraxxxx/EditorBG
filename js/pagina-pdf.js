@@ -32,6 +32,9 @@ const ICONES = {
   numeros: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16.5h8"/><path d="M9.5 12.5v-4l-1.5 1"/><path d="M13 8.5h2.5v2H13v2h2.5"/>'),
   marca: svg('<path d="M12 2.5 4 6v6c0 4.5 3.4 8.2 8 9.5 4.6-1.3 8-5 8-9.5V6Z"/><path d="M8.5 12.5h7"/>'),
   comprimir: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="m8.5 8.5 7 7M15.5 8.5l-7 7"/>'),
+  cadeado: svg('<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.5" r="1.4"/>'),
+  cadeadoAberto: svg('<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 7.6-1.7"/><circle cx="12" cy="15.5" r="1.4"/>'),
+  reparar: svg('<path d="M14.5 6.5a3.5 3.5 0 0 0 4.6 4.6l-8 8a2.3 2.3 0 0 1-3.2-3.2l8-8a3.5 3.5 0 0 0-1.4-1.4Z"/><path d="m5 5 3 3"/>'),
   recortar: svg('<path d="M6 3v13a2 2 0 0 0 2 2h13"/><path d="M3 6h13a2 2 0 0 1 2 2v13"/>'),
   assinar: svg('<path d="M3 19.5c2.5 0 3-2 3-4.5S5.5 7 8 7s2.5 3.5 2.5 6-1 5-1 5"/><path d="M9.5 14.5c3 0 5-1 7-3l4-4"/><path d="M17.5 4.5 20 7"/>'),
   comparar: svg('<rect x="2.5" y="4" width="8" height="16" rx="1.4"/><rect x="13.5" y="4" width="8" height="16" rx="1.4"/><path d="M15.5 9.5h4M15.5 13h2.5"/>'),
@@ -402,6 +405,77 @@ const FERRAMENTAS = [
       return {
         unico: { nome: base + '-pesquisavel.pdf', blob: r.pdf },
         recado: palavras + ' palavras reconhecidas. O PDF agora aceita busca e cópia.',
+      };
+    },
+  },
+  {
+    id: 'proteger',
+    nome: 'Proteger PDF',
+    sobre: 'Tranca o arquivo com senha. Sem ela, ninguém abre.',
+    icone: 'cadeado',
+    aceita: 'application/pdf',
+    aviso: 'A senha fica só com você. Não temos como recuperá-la nem guardá-la — '
+      + 'se você esquecer, o arquivo não abre mais.',
+    controles: () => `
+      <label class="ed-field">Senha nova
+        <input type="password" id="senha1" autocomplete="new-password" placeholder="pelo menos 4 caracteres" />
+      </label>
+      <label class="ed-field">Repita a senha
+        <input type="password" id="senha2" autocomplete="new-password" />
+      </label>
+      <label class="ed-field" id="campoAtual" hidden>Senha atual do arquivo
+        <input type="password" id="senhaAtual" autocomplete="current-password" />
+      </label>`,
+    preparar: mostrarCampoDeSenha,
+    async rodar(arquivos) {
+      const a = $('senha1').value;
+      const b = $('senha2').value;
+      if (a !== b) throw new Error('As duas senhas não são iguais.');
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-protegido.pdf',
+        blob: await PDF.proteger(arquivos[0], a, $('senhaAtual').value),
+      }, recado: 'Pronto. Guarde a senha: sem ela o arquivo não abre mais.' };
+    },
+  },
+  {
+    id: 'desbloquear',
+    nome: 'Desbloquear PDF',
+    sobre: 'Tira a senha de um PDF, para quem já sabe a senha.',
+    icone: 'cadeadoAberto',
+    aceita: 'application/pdf',
+    aviso: 'Isto não quebra senha: sem a senha certa o conteúdo é ilegível, e é assim '
+      + 'que deve ser. Serve para guardar aberta uma cópia de algo que chega trancado.',
+    controles: () => `
+      <label class="ed-field">Senha do arquivo
+        <input type="password" id="senhaAtual" autocomplete="current-password" />
+      </label>`,
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-aberto.pdf',
+        blob: await PDF.desbloquear(arquivos[0], $('senhaAtual').value),
+      } };
+    },
+  },
+  {
+    id: 'reparar',
+    nome: 'Reparar PDF',
+    sobre: 'Recupera um arquivo que não abre mais, reconstruindo o índice interno.',
+    icone: 'reparar',
+    aceita: 'application/pdf',
+    controles: () => `
+      <p class="ed-hint">O defeito mais comum é o índice interno apontar para o lugar
+      errado — o que acontece quando um download é interrompido ou o pendrive sai no
+      meio da gravação. O conteúdo quase sempre continua lá.</p>
+      <label class="ed-field" id="campoAtual" hidden>Senha do arquivo
+        <input type="password" id="senhaAtual" autocomplete="current-password" />
+      </label>`,
+    preparar: mostrarCampoDeSenha,
+    async rodar(arquivos) {
+      const r = await PDF.reparar(arquivos[0], $('senhaAtual') ? $('senhaAtual').value : '');
+      return {
+        unico: { nome: PDF.semExtensao(arquivos[0].name) + '-reparado.pdf', blob: r.blob },
+        recado: r.paginas + (r.paginas === 1 ? ' página recuperada' : ' páginas recuperadas')
+          + ' · ' + tamanho(r.bytes) + '.',
       };
     },
   },
@@ -1087,4 +1161,18 @@ function mostrarComparacao(paginas) {
         + '<img src="' + url + '" alt="Página ' + p.pagina + ' com as mudanças em vermelho" /></div>';
     }).join('')
     + '</div>';
+}
+
+/**
+ * Mostra o campo de senha atual só quando o arquivo realmente pede uma.
+ *
+ * Deixar o campo sempre visível faria a maioria das pessoas achar que precisa
+ * inventar uma senha para um arquivo que nunca teve senha nenhuma.
+ */
+async function mostrarCampoDeSenha(arquivos) {
+  const campo = $('campoAtual');
+  if (!campo) return;
+  const pede = await PDF.pedeSenha(arquivos[0]);
+  campo.hidden = !pede;
+  if (pede) dizer('Este arquivo pede senha para abrir. Escreva-a no campo acima.');
 }
