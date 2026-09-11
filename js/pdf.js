@@ -1615,3 +1615,188 @@ export async function textoParaPdf(texto, titulo) {
   if (!blocos.length) throw new Error('Não há texto para gerar o PDF.');
   return pdfDeBlocos(blocos);
 }
+
+/* ------------------------------------------------------------------ *
+ * PDF/A — o formato de arquivamento
+ * ------------------------------------------------------------------ */
+
+/**
+ * Monta um perfil de cor sRGB no formato ICC, byte a byte.
+ *
+ * PDF/A exige que o arquivo carregue dentro de si o perfil de cor com que foi
+ * feito — é o que garante que daqui a vinte anos as cores ainda signifiquem a
+ * mesma coisa. Baixar um perfil pronto de terceiros a cada conversão seria uma
+ * dependência de rede no meio de uma ferramenta que promete funcionar offline,
+ * então ele é construído aqui: são valores fixos e conhecidos do sRGB.
+ *
+ * Os XYZ estão adaptados para o iluminante D50 porque é o que o ICC usa como
+ * espaço de conexão — os números do sRGB que se vê em tabela costumam estar em
+ * D65 e não servem direto.
+ */
+function perfilSRGB() {
+  const enc = new TextEncoder();
+  const s15 = (v) => Math.round(v * 65536);          // s15Fixed16
+
+  const tagXYZ = (x, y, z) => {
+    const b = new DataView(new ArrayBuffer(20));
+    enc.encodeInto('XYZ ', new Uint8Array(b.buffer, 0, 4));
+    b.setInt32(8, s15(x)); b.setInt32(12, s15(y)); b.setInt32(16, s15(z));
+    return new Uint8Array(b.buffer);
+  };
+
+  // Curva com um único valor = gama. 2,2 em u8Fixed8 é 0x0233.
+  const tagCurva = () => {
+    const b = new DataView(new ArrayBuffer(14));
+    enc.encodeInto('curv', new Uint8Array(b.buffer, 0, 4));
+    b.setUint32(8, 1);
+    b.setUint16(12, 0x0233);
+    return new Uint8Array(b.buffer);
+  };
+
+  const tagTexto = (txt) => {
+    const bytes = enc.encode(txt);
+    const out = new Uint8Array(8 + bytes.length + 1);
+    out.set(enc.encode('text'), 0);
+    out.set(bytes, 8);
+    return out;
+  };
+
+  // 'desc' do ICC v2 tem três cópias do nome (ascii, unicode e macintosh).
+  const tagDesc = (txt) => {
+    const a = enc.encode(txt + '\0');
+    const total = 12 + a.length + 8 + 2 + 1 + 67;
+    const out = new Uint8Array(total);
+    const dv = new DataView(out.buffer);
+    out.set(enc.encode('desc'), 0);
+    dv.setUint32(8, a.length);
+    out.set(a, 12);
+    return out;
+  };
+
+  const tags = [
+    ['desc', tagDesc('sRGB IEC61966-2.1')],
+    ['wtpt', tagXYZ(0.9642, 1.0, 0.8249)],
+    ['rXYZ', tagXYZ(0.4360, 0.2225, 0.0139)],
+    ['gXYZ', tagXYZ(0.3851, 0.7169, 0.0971)],
+    ['bXYZ', tagXYZ(0.1431, 0.0606, 0.7139)],
+    ['rTRC', tagCurva()],
+    ['gTRC', tagCurva()],
+    ['bTRC', tagCurva()],
+    ['cprt', tagTexto('Perfil sRGB de dominio publico')],
+  ];
+
+  const CABECALHO = 128;
+  const tabela = 4 + tags.length * 12;
+  let posicao = CABECALHO + tabela;
+
+  const colocados = tags.map(([sig, dados]) => {
+    const p = posicao;
+    // Cada tag começa em múltiplo de 4: o ICC exige alinhamento.
+    posicao += dados.length + ((4 - (dados.length % 4)) % 4);
+    return { sig, dados, p };
+  });
+
+  const total = posicao;
+  const buf = new Uint8Array(total);
+  const dv = new DataView(buf.buffer);
+
+  dv.setUint32(0, total);
+  buf.set(enc.encode('mntr'), 12);        // classe: monitor
+  buf.set(enc.encode('RGB '), 16);
+  buf.set(enc.encode('XYZ '), 20);
+  dv.setUint32(8, 0x02100000);            // versão 2.1
+  buf.set(enc.encode('acsp'), 36);
+  dv.setInt32(68, s15(0.9642));           // iluminante D50
+  dv.setInt32(72, s15(1.0));
+  dv.setInt32(76, s15(0.8249));
+
+  dv.setUint32(CABECALHO, tags.length);
+  colocados.forEach(({ sig, dados, p }, i) => {
+    const base = CABECALHO + 4 + i * 12;
+    buf.set(enc.encode(sig), base);
+    dv.setUint32(base + 4, p);
+    dv.setUint32(base + 8, dados.length);
+    buf.set(dados, p);
+  });
+
+  return buf;
+}
+
+/** O XMP que declara, dentro do arquivo, que ele é um PDF/A. */
+function xmpDePdfA(titulo, quando) {
+  const data = quando.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const escapar = (t) => String(t).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">
+   <pdfaid:part>1</pdfaid:part>
+   <pdfaid:conformance>B</pdfaid:conformance>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${escapar(titulo)}</rdf:li></rdf:Alt></dc:title>
+  </rdf:Description>
+  <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/">
+   <xmp:CreatorTool>EditorBG</xmp:CreatorTool>
+   <xmp:CreateDate>${data}</xmp:CreateDate>
+   <xmp:ModifyDate>${data}</xmp:ModifyDate>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+}
+
+/**
+ * Converte para PDF/A-1b, o formato de arquivamento de longo prazo.
+ *
+ * A conversão desenha cada página como imagem antes de remontar o arquivo. Isso
+ * resolve de uma vez a exigência mais difícil do PDF/A — toda fonte usada tem
+ * que estar embutida no arquivo — porque numa página desenhada não há fonte
+ * nenhuma. O preço é o mesmo da compressão: o texto deixa de ser texto, e não
+ * dá mais para buscar nem copiar.
+ *
+ * O arquivo também precisa: carregar o perfil de cor com que foi feito
+ * (OutputIntent), declarar em XMP que é PDF/A, e ser gravado com tabela de
+ * referências clássica — PDF/A-1 não aceita os fluxos de objeto que os PDFs
+ * modernos usam para ficar menores.
+ */
+export async function paraPdfA(arquivo, opcoes = {}, aoProgredir = () => {}) {
+  const { PDFDocument, PDFName, PDFString } = await lib();
+  const paginas = await paraImagens(arquivo, { escala: opcoes.escala || 2, tipo: 'jpeg' }, aoProgredir);
+
+  const doc = await PDFDocument.create();
+  for (const { blob } of paginas) {
+    const imagem = await doc.embedJpg(await blob.arrayBuffer());
+    const p = doc.addPage([imagem.width, imagem.height]);
+    p.drawImage(imagem, { x: 0, y: 0, width: imagem.width, height: imagem.height });
+  }
+
+  const titulo = semExtensao(arquivo.name);
+  const agora = new Date();
+  doc.setTitle(titulo);
+  doc.setProducer('EditorBG');
+  doc.setCreator('EditorBG');
+  doc.setCreationDate(agora);
+  doc.setModificationDate(agora);
+
+  const icc = perfilSRGB();
+  const fluxoIcc = doc.context.stream(icc, { N: 3 });
+  const refIcc = doc.context.register(fluxoIcc);
+
+  const intencao = doc.context.obj({
+    Type: 'OutputIntent',
+    S: 'GTS_PDFA1',
+    OutputConditionIdentifier: PDFString.of('sRGB IEC61966-2.1'),
+    Info: PDFString.of('sRGB IEC61966-2.1'),
+    RegistryName: PDFString.of('http://www.color.org'),
+    DestOutputProfile: refIcc,
+  });
+  doc.catalog.set(PDFName.of('OutputIntents'), doc.context.obj([intencao]));
+
+  const xmp = xmpDePdfA(titulo, agora);
+  const fluxoXmp = doc.context.stream(xmp, { Type: 'Metadata', Subtype: 'XML' });
+  doc.catalog.set(PDFName.of('Metadata'), doc.context.register(fluxoXmp));
+
+  // Sem fluxos de objeto: o PDF/A-1 exige a tabela de referências antiga.
+  return comoPdf(await doc.save({ useObjectStreams: false }));
+}

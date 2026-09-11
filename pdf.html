@@ -140,14 +140,30 @@
       desligar a internet e continuar usando.
     </p>
 
-    <h3>Por que não tem "PDF para Word"</h3>
+    <h3>O que esperar do "PDF para Word"</h3>
     <p>
-      Porque essa conversão não é uma conta simples. Um PDF guarda letras
-      soltas com a posição de cada uma na folha, e não parágrafos, tabelas ou
-      colunas. Refazer um documento editável a partir disso exige um programa
-      pesado rodando num servidor — exatamente o que este site não faz. Preferi
-      não ter a ferramenta a ter uma que devolve um arquivo bagunçado ou que
-      quebra a promessa de não enviar nada.
+      Um PDF guarda letras soltas com a posição de cada uma na folha. Ele não
+      guarda parágrafos, tabelas nem colunas — essas coisas são deduzidas na
+      hora da conversão: título é reconhecido porque está escrito maior que o
+      resto, e coluna de tabela porque os textos se alinham página abaixo.
+    </p>
+    <p>
+      O resultado é um documento editável de verdade, com títulos e listas, e
+      não uma foto da página dentro do Word. O que não sobrevive é o layout
+      milimétrico: margens exatas, posicionamento de imagem e desenho de tabela
+      se perdem, porque essa informação nunca esteve no arquivo para ser
+      recuperada.
+    </p>
+
+    <h3>A IA que resume e traduz roda aqui dentro</h3>
+    <p>
+      Resumir e traduzir precisam de um modelo de linguagem, e mandar o
+      documento para um serviço de IA na nuvem seria justamente o que este site
+      não faz. Por isso essas duas ferramentas usam o modelo que o próprio
+      navegador instala e executa no seu computador. A consequência honesta é
+      que elas dependem do navegador ter esse modelo — hoje, o Chrome no
+      computador. Quando ele não está disponível, a ferramenta diz isso em vez
+      de devolver um resultado inventado.
     </p>
 
     <details class="faq">
@@ -173,9 +189,23 @@
     <details class="faq">
       <summary>Dá para abrir PDF com senha?</summary>
       <p>
-        Arquivos apenas marcados como "somente leitura", que é o caso da maioria
-        das notas fiscais e extratos, abrem normalmente. PDF com senha de
-        verdade, que exige a senha para ser lido, ainda não é suportado.
+        Dá, se você souber a senha. Arquivos apenas marcados como "somente
+        leitura", que é o caso da maioria das notas fiscais e extratos, abrem
+        direto. Os que exigem senha para serem lidos pedem a senha no campo da
+        ferramenta. O que este site não faz — nem tenta — é descobrir senha:
+        sem ela o conteúdo é ilegível, e assim deve ser.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>O PDF/A que sai daqui vale para o cartório?</summary>
+      <p>
+        O arquivo é gerado seguindo o PDF/A-1b: as páginas viram imagem, o que
+        elimina a exigência de fontes embutidas, e ele carrega o perfil de cor
+        sRGB, a declaração em XMP e a tabela de referências antiga que a norma
+        pede. Ainda assim, onde o formato for obrigatório por lei vale passar um
+        arquivo por um validador antes de entregar em lote — a conformidade
+        quem atesta é o validador, não quem gera.
       </p>
     </details>
   </section>

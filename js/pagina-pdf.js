@@ -32,6 +32,7 @@ const ICONES = {
   numeros: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16.5h8"/><path d="M9.5 12.5v-4l-1.5 1"/><path d="M13 8.5h2.5v2H13v2h2.5"/>'),
   marca: svg('<path d="M12 2.5 4 6v6c0 4.5 3.4 8.2 8 9.5 4.6-1.3 8-5 8-9.5V6Z"/><path d="M8.5 12.5h7"/>'),
   comprimir: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="m8.5 8.5 7 7M15.5 8.5l-7 7"/>'),
+  arquivo: svg('<path d="M3 7h18v12a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z"/><path d="M2 3.5h20V7H2Z"/><path d="M9.5 11h5"/>'),
   word: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8 12 1.6 5 1.9-5 1.9 5L15 12"/>'),
   excel: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8.5 12 5 5m0-5-5 5"/>'),
   ppt: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="M8.5 17v-5h2.6a1.7 1.7 0 0 1 0 3.4H8.5"/>'),
@@ -647,6 +648,29 @@ const FERRAMENTAS = [
         return { unico: { nome: base + '.txt', blob: new Blob([traduzido], { type: 'text/plain;charset=utf-8' }) } };
       }
       return { unico: { nome: base + '.pdf', blob: await PDF.textoParaPdf(traduzido, null) } };
+    },
+  },
+  {
+    id: 'pdfa',
+    nome: 'PDF para PDF/A',
+    sobre: 'Converte para o formato de arquivamento de longo prazo.',
+    icone: 'arquivo',
+    aceita: 'application/pdf',
+    aviso: 'A conversão desenha cada página como imagem. É o que resolve a exigência '
+      + 'mais difícil do PDF/A — toda fonte tem que estar embutida — mas o texto deixa '
+      + 'de ser texto: não dá mais para buscar nem copiar.',
+    controles: () => seletor('escala', 'Qualidade das páginas', [
+      ['1.5', 'Menor arquivo'],
+      ['2', 'Equilibrado · recomendado'],
+      ['3', 'Alta · para impressão'],
+    ]) + '<p class="ed-hint small">PDF/A é o formato que órgãos públicos e cartórios '
+      + 'costumam exigir para guardar documento por décadas. Vale conferir o arquivo '
+      + 'num validador antes de entregar onde for obrigatório.</p>',
+    async rodar(arquivos, aoProgredir) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-pdfa.pdf',
+        blob: await PDF.paraPdfA(arquivos[0], { escala: Number($('escala').value) }, aoProgredir),
+      }, recado: 'Convertido para PDF/A-1b, com o perfil de cor embutido.' };
     },
   },
 ];
