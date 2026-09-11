@@ -6,7 +6,7 @@
  * só é usada no "Aplicar", pelo compose() da galeria.
  */
 import { geometry, drawCutout, fonteAjustada, cloneCanvas, defaultEdit } from './compose.js';
-import { ajustesPadrao } from './adjust.js';
+import { ajustesPadrao, FILTROS, aplicarFiltro } from './adjust.js';
 import * as L from './layers.js';
 import { refreshSliders } from './sliders.js';
 
@@ -738,6 +738,95 @@ el.inverter.addEventListener('change', () => {
   S.edit.adjust.inverter = el.inverter.checked;
   draw();
 });
+
+/* ------------------------------------------------------------------ *
+ * Filtros prontos — grátis
+ * ------------------------------------------------------------------ */
+(function montarFiltros() {
+  const caixa = $('edFiltros');
+  if (!caixa) return;
+
+  for (const [id, f] of Object.entries(FILTROS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ed-filtro' + (id === 'nenhum' ? ' is-active' : '');
+    b.dataset.filtro = id;
+    b.textContent = f.nome;
+    caixa.append(b);
+  }
+
+  caixa.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-filtro]');
+    if (!b || !S) return;
+
+    pushHistory();
+    // Substitui o conjunto inteiro, não remenda por cima: aplicar dois filtros
+    // seguidos tem que dar o segundo, e não os dois somados.
+    S.edit.adjust = aplicarFiltro(b.dataset.filtro);
+    for (const outro of caixa.children) outro.classList.toggle('is-active', outro === b);
+    syncControlsFromEdit();
+    draw();
+  });
+})();
+
+/* ------------------------------------------------------------------ *
+ * Marca d'água — VIP
+ * ------------------------------------------------------------------ */
+function marcaAtual() {
+  return {
+    texto: $('marcaTexto').value,
+    tamanho: Number($('marcaTamanho').value) / 100,
+    opacidade: Number($('marcaOpacidade').value) / 100,
+    posicao: $('marcaPosicao').querySelector('.is-active').dataset.pos,
+    repetir: $('marcaRepetir').checked,
+    cor: '#ffffff',
+  };
+}
+
+/**
+ * O paywall entra por import dinâmico, não estático: ele injeta o próprio
+ * markup com await no topo do módulo, e amarrar o editor a isso atrasaria a
+ * abertura do editor por causa de um recurso que quase ninguém usa.
+ */
+async function aplicarMarca() {
+  if (!S) return;
+
+  const Paywall = await import('./paywall.js');
+
+  if (!Paywall.temHD()) {
+    // Limpa o que a pessoa digitou e mostra os planos. Deixar o campo aceitar
+    // texto que nunca aparece na imagem seria pior do que recusar na hora.
+    $('marcaTexto').value = '';
+    S.edit.marca = null;
+    draw();
+    Paywall.abrirPaywall(null, null);
+    return;
+  }
+
+  const m = marcaAtual();
+  S.edit.marca = m.texto.trim() ? m : null;
+  draw();
+}
+
+for (const id of ['marcaTexto', 'marcaTamanho', 'marcaOpacidade', 'marcaRepetir']) {
+  const el2 = $(id);
+  if (!el2) continue;
+  el2.addEventListener('input', () => {
+    $('marcaTamanhoVal').textContent = $('marcaTamanho').value + '%';
+    $('marcaOpacidadeVal').textContent = $('marcaOpacidade').value + '%';
+    aplicarMarca();
+  });
+  el2.addEventListener('change', aplicarMarca);
+}
+
+if ($('marcaPosicao')) {
+  $('marcaPosicao').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pos]');
+    if (!b) return;
+    for (const outro of $('marcaPosicao').children) outro.classList.toggle('is-active', outro === b);
+    aplicarMarca();
+  });
+}
 
 el.adjustReset.addEventListener('click', () => {
   pushHistory();

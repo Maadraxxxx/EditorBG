@@ -173,6 +173,72 @@ function comSombra(cut, { x, y, desfoque, opacidade, cor }) {
   return out;
 }
 
+/* ------------------------------------------------------------------ *
+ * Marca d'água
+ * ------------------------------------------------------------------ */
+
+/**
+ * Escreve a marca sobre a imagem já pronta.
+ *
+ * O tamanho é uma FRAÇÃO da imagem, não um número de pixels: a mesma marca
+ * precisa parecer igual numa foto de 400px e numa de 3000px, e com pixels
+ * fixos ela sairia gigante numa e ilegível na outra.
+ *
+ * O contorno escuro por baixo não é enfeite — sem ele, marca branca sobre céu
+ * claro simplesmente desaparece, que é o único caso em que ela precisava estar
+ * visível.
+ */
+function desenharMarca(canvas, marca) {
+  const texto = String(marca.texto || '').trim();
+  if (!texto || marca.opacidade <= 0) return canvas;
+
+  const ctx = canvas.getContext('2d');
+  const corpo = Math.max(10, Math.round(Math.min(canvas.width, canvas.height) * marca.tamanho));
+
+  ctx.save();
+  ctx.globalAlpha = marca.opacidade;
+  ctx.font = '600 ' + corpo + 'px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = marca.cor || '#ffffff';
+  ctx.strokeStyle = 'rgba(0, 0, 0, .35)';
+  ctx.lineWidth = Math.max(1, corpo * 0.06);
+  ctx.lineJoin = 'round';
+
+  if (marca.repetir) {
+    // Diagonal e repetida: é a versão difícil de recortar fora, para quem
+    // manda prova de trabalho antes de receber.
+    const larg = ctx.measureText(texto).width;
+    const passoX = larg + corpo * 2.2;
+    const passoY = corpo * 3.4;
+
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(-Math.PI / 6);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    const alcance = Math.hypot(canvas.width, canvas.height);
+    for (let y = -alcance; y < alcance; y += passoY) {
+      // Fileiras alternadas deslocadas: em grade reta o olho vê colunas.
+      const desloca = (Math.round(y / passoY) % 2) * (passoX / 2);
+      for (let x = -alcance + desloca; x < alcance; x += passoX) {
+        ctx.strokeText(texto, x, y);
+        ctx.fillText(texto, x, y);
+      }
+    }
+  } else {
+    const margem = corpo * 0.8;
+    const canto = marca.posicao || 'inferior-direita';
+    ctx.textAlign = canto.includes('direita') ? 'right' : 'left';
+    ctx.textBaseline = canto.includes('inferior') ? 'bottom' : 'top';
+    const x = canto.includes('direita') ? canvas.width - margem : margem;
+    const y = canto.includes('inferior') ? canvas.height - margem : margem;
+    ctx.strokeText(texto, x, y);
+    ctx.fillText(texto, x, y);
+  }
+
+  ctx.restore();
+  return canvas;
+}
+
 /** Render final, em resolução cheia. */
 export function compose(item, { background, feather, contorno, sombra }) {
   const g = geometry(item.bitmap.width, item.bitmap.height, item.edit);
@@ -216,7 +282,11 @@ export function compose(item, { background, feather, contorno, sombra }) {
   if (contorno && contorno.largura > 0) cut = comContorno(cut, contorno);
   if (sombra && sombra.opacidade > 0) cut = comSombra(cut, sombra);
 
-  if (background === 'transparent') return cut;
+  // A marca vai por ÚLTIMO, depois do fundo: sobre o recorte ela sumiria junto
+  // com as partes transparentes, que é o oposto do que uma marca serve.
+  if (background === 'transparent') {
+    return item.edit.marca ? desenharMarca(cut, item.edit.marca) : cut;
+  }
 
   const out = document.createElement('canvas');
   out.width = cut.width;
@@ -225,7 +295,7 @@ export function compose(item, { background, feather, contorno, sombra }) {
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, out.width, out.height);
   ctx.drawImage(cut, 0, 0);
-  return out;
+  return item.edit.marca ? desenharMarca(out, item.edit.marca) : out;
 }
 
 /** Máscara em tons de cinza -> canvas branco cujo ALPHA é a máscara. */

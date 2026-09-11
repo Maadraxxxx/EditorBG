@@ -102,6 +102,14 @@
 
         <!-- AJUSTES -->
         <div class="ed-panel" data-panel="adjust">
+          <!-- Filtros prontos: grátis. Combinações dos mesmos controles abaixo,
+               para quem pensa "quero que pareça antigo" em vez de "quero -40
+               de saturação". -->
+          <div class="aj-grupo">
+            <span class="aj-titulo">Filtros</span>
+            <div class="ed-filtros" id="edFiltros"></div>
+          </div>
+
           <div class="aj-grupo">
             <span class="aj-titulo">Balanço de brancos</span>
           <label class="ed-field">
@@ -252,6 +260,34 @@
               <button data-weight="400">Normal</button>
               <button data-weight="700" class="is-active">Negrito</button>
             </div>
+          </div>
+        </div>
+
+          <div class="aj-grupo">
+            <span class="aj-titulo">Marca d'água <span class="selo-vip">VIP</span></span>
+            <label class="ed-field">Texto
+              <input type="text" id="marcaTexto" maxlength="40" placeholder="seu nome ou @perfil" />
+            </label>
+            <label class="ed-field">
+              Tamanho <span class="val" id="marcaTamanhoVal">6%</span>
+              <input type="range" id="marcaTamanho" min="2" max="16" step="1" value="6" />
+            </label>
+            <label class="ed-field">
+              Opacidade <span class="val" id="marcaOpacidadeVal">55%</span>
+              <input type="range" id="marcaOpacidade" min="5" max="100" step="1" value="55" />
+            </label>
+            <div class="ratios" id="marcaPosicao">
+              <button data-pos="inferior-direita" class="is-active">↘</button>
+              <button data-pos="inferior-esquerda">↙</button>
+              <button data-pos="superior-direita">↗</button>
+              <button data-pos="superior-esquerda">↖</button>
+            </div>
+            <label class="switch small">
+              <input type="checkbox" id="marcaRepetir" />
+              <span class="track"><span class="knob"></span></span>
+              <span class="switch-text">Repetir em diagonal</span>
+            </label>
+            <p class="ed-hint small">Repetida é a versão difícil de recortar fora — para mandar prova de trabalho antes de receber.</p>
           </div>
         </div>
 

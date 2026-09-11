@@ -30,6 +30,33 @@ export function ajustesPadrao() {
   return { ...AJUSTES_PADRAO };
 }
 
+/* ------------------------------------------------------------------ *
+ * Filtros prontos
+ * ------------------------------------------------------------------ *
+ * Combinações dos mesmos treze controles. Existem porque ninguém abre um
+ * editor pensando "quero -40 de saturação e +18 de temperatura" — pensa
+ * "quero que pareça antigo".
+ *
+ * Cada filtro é o conjunto COMPLETO de ajustes, não um remendo por cima do que
+ * estava: aplicar dois seguidos tem que dar o segundo, não os dois somados.
+ */
+export const FILTROS = {
+  nenhum:    { nome: 'Original',  ajustes: {} },
+  pb:        { nome: 'P&B',       ajustes: { saturacao: -100, contraste: 14, claridade: 10 } },
+  sepia:     { nome: 'Sépia',     ajustes: { saturacao: -74, temperatura: 42, brilho: 4, contraste: 8 } },
+  vivido:    { nome: 'Vívido',    ajustes: { saturacao: 26, vibracao: 30, contraste: 16, nitidez: 18 } },
+  frio:      { nome: 'Frio',      ajustes: { temperatura: -30, matiz: -8, contraste: 8 } },
+  quente:    { nome: 'Quente',    ajustes: { temperatura: 28, brilho: 4, vibracao: 12 } },
+  desbotado: { nome: 'Desbotado', ajustes: { contraste: -26, saturacao: -30, brilho: 8, sombras: 22 } },
+  dramatico: { nome: 'Dramático', ajustes: { contraste: 30, claridade: 34, sombras: -20, saturacao: -12, vinheta: 26 } },
+};
+
+/** Os ajustes de um filtro, já completos — o que não está nele volta ao padrão. */
+export function aplicarFiltro(id) {
+  const f = FILTROS[id];
+  return { ...AJUSTES_PADRAO, ...(f ? f.ajustes : {}) };
+}
+
 /** Nenhum ajuste mexido: dá para pular o processamento inteiro. */
 export function semAjustes(a) {
   for (const k of Object.keys(AJUSTES_PADRAO)) {
