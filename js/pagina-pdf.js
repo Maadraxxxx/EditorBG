@@ -32,6 +32,11 @@ const ICONES = {
   numeros: svg('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16.5h8"/><path d="M9.5 12.5v-4l-1.5 1"/><path d="M13 8.5h2.5v2H13v2h2.5"/>'),
   marca: svg('<path d="M12 2.5 4 6v6c0 4.5 3.4 8.2 8 9.5 4.6-1.3 8-5 8-9.5V6Z"/><path d="M8.5 12.5h7"/>'),
   comprimir: svg('<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9"/><path d="M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/><path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9"/><path d="m8.5 8.5 7 7M15.5 8.5l-7 7"/>'),
+  recortar: svg('<path d="M6 3v13a2 2 0 0 0 2 2h13"/><path d="M3 6h13a2 2 0 0 1 2 2v13"/>'),
+  assinar: svg('<path d="M3 19.5c2.5 0 3-2 3-4.5S5.5 7 8 7s2.5 3.5 2.5 6-1 5-1 5"/><path d="M9.5 14.5c3 0 5-1 7-3l4-4"/><path d="M17.5 4.5 20 7"/>'),
+  comparar: svg('<rect x="2.5" y="4" width="8" height="16" rx="1.4"/><rect x="13.5" y="4" width="8" height="16" rx="1.4"/><path d="M15.5 9.5h4M15.5 13h2.5"/>'),
+  markdown: svg('<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M6 15.5v-7l3 3.5 3-3.5v7"/><path d="M15.5 8.5v5m0 0 2-2m-2 2-2-2"/>'),
+  ocr: svg('<path d="M3.5 8V5.5A2 2 0 0 1 5.5 3.5H8"/><path d="M16 3.5h2.5a2 2 0 0 1 2 2V8"/><path d="M20.5 16v2.5a2 2 0 0 1-2 2H16"/><path d="M8 20.5H5.5a2 2 0 0 1-2-2V16"/><path d="M7.5 12h9"/><path d="M9 9h6M9 15h4"/>'),
   texto: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="M8.5 12.5h7M8.5 16h4"/>'),
 };
 
@@ -165,7 +170,12 @@ const FERRAMENTAS = [
     aceita: 'application/pdf',
     controles: () => seletor('posicao', 'Posição', [
       ['centro', 'Centro'], ['direita', 'Direita'], ['esquerda', 'Esquerda'],
-    ]) + seletor('formato', 'Formato', [['so', '1, 2, 3…'], ['de', '1 de 10']])
+    ]) + seletor('formato', 'Formato', [
+        ['so', '1, 2, 3…'],
+        ['de', '1 de 10'],
+        ['romano', 'I, II, III (romanos)'],
+        ['romano-minusculo', 'i, ii, iii (romanos minúsculos)'],
+      ])
       + '<label class="ed-field">Começar em <input type="number" id="comeco" value="1" min="1" max="9999" /></label>',
     async rodar(arquivos) {
       return { unico: {
@@ -258,6 +268,143 @@ const FERRAMENTAS = [
       } };
     },
   },
+  {
+    id: 'recortar',
+    nome: 'Recortar PDF',
+    sobre: 'Corta as margens. Arraste as bordas na própria página para escolher.',
+    icone: 'recortar',
+    aceita: 'application/pdf',
+    controles: () => campoPaginas('paginas', 'Quais páginas (deixe vazio para todas)')
+      + '<p class="ed-hint small">O conteúdo cortado não é apagado, só fica fora da área visível — dá para voltar atrás depois.</p>',
+    preparar: montarRecorte,
+    async rodar(arquivos) {
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-recortado.pdf',
+        blob: await PDF.recortar(arquivos[0], corte, $('paginas').value),
+      } };
+    },
+  },
+  {
+    id: 'assinar',
+    nome: 'Assinar PDF',
+    sobre: 'Desenhe sua assinatura e coloque onde quiser na página.',
+    icone: 'assinar',
+    aceita: 'application/pdf',
+    aviso: 'Isto é o mesmo que assinar à caneta e digitalizar: NÃO é assinatura '
+      + 'digital com certificado ICP-Brasil, e não tem a validade jurídica de uma.',
+    controles: () => `
+      <label class="ed-field">Tamanho <span class="val" id="asTamanhoVal">28%</span>
+        <input type="range" id="asTamanho" min="8" max="60" step="1" value="28" />
+      </label>
+      <label class="switch small">
+        <input type="checkbox" id="asTodas" />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text">Repetir em todas as páginas</span>
+      </label>`,
+    preparar: montarAssinatura,
+    async rodar(arquivos) {
+      const png = await pngDaAssinatura();
+      if (!png) throw new Error('Desenhe a assinatura no quadro branco, ou escolha uma imagem dela.');
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '-assinado.pdf',
+        blob: await PDF.assinar(arquivos[0], png, {
+          pagina: paginaDaPrevia,
+          x: assinatura.x,
+          y: assinatura.y,
+          largura: Number($('asTamanho').value) / 100,
+          todas: $('asTodas').checked,
+        }),
+      } };
+    },
+  },
+  {
+    id: 'comparar',
+    nome: 'Comparar PDF',
+    sobre: 'Mostra o que mudou entre duas versões, marcado em vermelho.',
+    icone: 'comparar',
+    aceita: 'application/pdf',
+    varios: true,
+    dica: 'Arraste os dois PDFs aqui',
+    tipos: 'PDF · exatamente dois: a versão antiga e a nova',
+    controles: () => '<p class="ed-hint">O primeiro da lista é a versão antiga; o segundo, a nova. '
+      + 'A comparação é visual, então carimbo movido e assinatura acrescentada também aparecem.</p>',
+    async rodar(arquivos, aoProgredir) {
+      if (arquivos.length !== 2) throw new Error('Escolha exatamente dois PDFs: o antigo e o novo.');
+      const paginas = await PDF.comparar(arquivos[0], arquivos[1], aoProgredir);
+      mostrarComparacao(paginas);
+
+      const mudaram = paginas.filter((p) => p.diferenca > 0.0005);
+      return {
+        semArquivo: true,
+        recado: mudaram.length
+          ? mudaram.length + (mudaram.length === 1 ? ' página mudou' : ' páginas mudaram')
+            + ': ' + mudaram.map((p) => p.pagina).join(', ') + '. O que mudou está em vermelho abaixo.'
+          : 'Os dois arquivos estão iguais — nenhuma diferença visível em '
+            + paginas.length + (paginas.length === 1 ? ' página.' : ' páginas.'),
+      };
+    },
+  },
+  {
+    id: 'markdown',
+    nome: 'PDF para Markdown',
+    sobre: 'Extrai o texto já com títulos, listas e negrito marcados.',
+    icone: 'markdown',
+    aceita: 'application/pdf',
+    controles: () => '<p class="ed-hint">Os títulos são descobertos pelo tamanho da letra: '
+      + 'o PDF não guarda essa informação, mas título quase sempre é escrito maior que o texto.</p>',
+    async rodar(arquivos) {
+      const md = await PDF.paraMarkdown(arquivos[0]);
+      if (!md.trim()) {
+        throw new Error('Este PDF não tem texto — provavelmente é digitalizado. '
+          + 'Use a ferramenta de OCR primeiro.');
+      }
+      return { unico: {
+        nome: PDF.semExtensao(arquivos[0].name) + '.md',
+        blob: new Blob([md], { type: 'text/markdown;charset=utf-8' }),
+      } };
+    },
+  },
+  {
+    id: 'ocr',
+    nome: 'OCR — PDF pesquisável',
+    sobre: 'Lê o texto de um documento digitalizado e devolve o PDF com busca.',
+    icone: 'ocr',
+    aceita: 'application/pdf',
+    aviso: 'Baixa um modelo de leitura de cerca de 10 MB na primeira vez, e demora '
+      + 'alguns segundos por página. A aparência do documento não muda: o texto entra '
+      + 'numa camada invisível por baixo, que é o que permite buscar e copiar.',
+    controles: () => seletor('idioma', 'Idioma do documento', [
+      ['por', 'Português'], ['eng', 'Inglês'], ['spa', 'Espanhol'],
+    ]) + seletor('saida', 'O que baixar', [
+      ['pdf', 'PDF pesquisável'], ['txt', 'Só o texto (.txt)'],
+    ]),
+    async rodar(arquivos, aoProgredir) {
+      const r = await PDF.ocr(arquivos[0], { idioma: $('idioma').value }, (f, fase, feito, total) => {
+        aoProgredir(f, feito || 0, total || 0);
+        if (fase === 'baixando') dizer('Baixando o modelo de leitura…');
+        else if (fase === 'lendo') dizer('Lendo a página ' + feito + ' de ' + total + '…');
+      });
+
+      if (!r.texto.trim()) {
+        throw new Error('Não foi possível ler texto nenhum. A digitalização pode estar '
+          + 'torta, muito clara ou de baixa resolução.');
+      }
+
+      const base = PDF.semExtensao(arquivos[0].name);
+      const palavras = r.texto.split(/\s+/).filter(Boolean).length;
+
+      if ($('saida').value === 'txt' || !r.pdf) {
+        return {
+          unico: { nome: base + '.txt', blob: new Blob([r.texto], { type: 'text/plain;charset=utf-8' }) },
+          recado: palavras + ' palavras reconhecidas.',
+        };
+      }
+      return {
+        unico: { nome: base + '-pesquisavel.pdf', blob: r.pdf },
+        recado: palavras + ' palavras reconhecidas. O PDF agora aceita busca e cópia.',
+      };
+    },
+  },
 ];
 
 function tamanho(bytes) {
@@ -305,6 +452,8 @@ function abrir(f) {
   $('file').multiple = !!f.varios;
 
   $('opcoes').innerHTML = f.controles ? f.controles() : '';
+  $('extra').innerHTML = '';
+  $('extra').hidden = true;
   $('aviso').hidden = !f.aviso;
   $('aviso').textContent = f.aviso || '';
 
@@ -395,6 +544,15 @@ function receber(arquivos) {
   $('maisArquivos').hidden = !atual.varios;
   $('estado').hidden = true;
   listar();
+
+  // Ferramentas que escolhem POSIÇÃO montam a prévia da página aqui. É depois
+  // do arquivo chegar porque a prévia é desenhada a partir dele.
+  if (atual.preparar) {
+    dizer('Abrindo a página…');
+    atual.preparar(escolhidos)
+      .then(() => { $('estado').hidden = true; })
+      .catch((e) => dizer(e.message || 'Não deu para abrir este PDF.', true));
+  }
 }
 
 // Escolher mais arquivos depois do primeiro. A área de soltar some quando o
@@ -486,6 +644,8 @@ $('arquivos').addEventListener('dragend', () => {
 
 $('limpar').addEventListener('click', () => {
   escolhidos = [];
+  $('extra').innerHTML = '';
+  $('extra').hidden = true;
   $('trabalho').hidden = true;
   $('maisArquivos').hidden = true;
   $('drop').hidden = false;
@@ -532,3 +692,399 @@ $('executar').addEventListener('click', async () => {
     $('barra').hidden = true;
   }
 });
+
+/* ------------------------------------------------------------------ *
+ * Recortar: moldura arrastável sobre a página
+ * ------------------------------------------------------------------ */
+
+/** Sobras de cada lado, em fração. É o que a ferramenta manda para o motor. */
+let corte = { esq: 0, dir: 0, topo: 0, base: 0 };
+let paginaDaPrevia = 1;
+
+async function montarRecorte(arquivos) {
+  corte = { esq: 0, dir: 0, topo: 0, base: 0 };
+  paginaDaPrevia = 1;
+
+  $('extra').hidden = false;
+  $('extra').innerHTML = `
+    <div class="pdf-previa">
+      <div class="pdf-folha" id="folha">
+        <div class="pdf-corte" id="caixaCorte">
+          <span class="pdf-alca" data-lado="topo"></span>
+          <span class="pdf-alca" data-lado="base"></span>
+          <span class="pdf-alca" data-lado="esq"></span>
+          <span class="pdf-alca" data-lado="dir"></span>
+        </div>
+      </div>
+      <div class="pdf-previa-pe">
+        <button class="btn ghost" data-ir="-1" type="button">‹</button>
+        <span id="previaConta">—</span>
+        <button class="btn ghost" data-ir="1" type="button">›</button>
+        <button class="btn ghost" id="corteZerar" type="button">Sem corte</button>
+      </div>
+    </div>`;
+
+  await trocarPagina(arquivos[0], 1);
+  aplicarCaixa();
+
+  $('extra').addEventListener('click', async (e) => {
+    const ir = e.target.closest('[data-ir]');
+    if (ir) await trocarPagina(arquivos[0], paginaDaPrevia + Number(ir.dataset.ir));
+    if (e.target.id === 'corteZerar') {
+      corte = { esq: 0, dir: 0, topo: 0, base: 0 };
+      aplicarCaixa();
+    }
+  });
+
+  arrastarMolduras();
+}
+
+let totalDaPrevia = 1;
+
+async function trocarPagina(arquivo, n) {
+  const { canvas, paginas } = await PDF.renderizarPagina(arquivo, n, 440);
+  totalDaPrevia = paginas;
+  paginaDaPrevia = Math.min(Math.max(1, n), paginas);
+
+  const folha = $('folha');
+  const antiga = folha.querySelector('canvas');
+  if (antiga) antiga.remove();
+  folha.prepend(canvas);
+  folha.style.width = canvas.width + 'px';
+  folha.style.height = canvas.height + 'px';
+
+  const conta = $('previaConta');
+  if (conta) conta.textContent = 'Página ' + paginaDaPrevia + ' de ' + paginas;
+}
+
+/** Desenha a moldura a partir das frações. */
+function aplicarCaixa() {
+  const c = $('caixaCorte');
+  if (!c) return;
+  c.style.left = (corte.esq * 100) + '%';
+  c.style.right = (corte.dir * 100) + '%';
+  c.style.top = (corte.topo * 100) + '%';
+  c.style.bottom = (corte.base * 100) + '%';
+}
+
+/**
+ * Arrastar as quatro bordas.
+ *
+ * Cada lado é limitado a deixar pelo menos 10% de página: sem esse piso dá para
+ * arrastar uma borda por cima da outra, e o resultado é uma página de tamanho
+ * negativo que o leitor de PDF recusa abrir.
+ */
+function arrastarMolduras() {
+  const folha = $('folha');
+  if (!folha) return;
+  let lado = null;
+
+  folha.addEventListener('pointerdown', (e) => {
+    const alca = e.target.closest('[data-lado]');
+    if (!alca) return;
+    e.preventDefault();
+    lado = alca.dataset.lado;
+    try { folha.setPointerCapture(e.pointerId); } catch { /* ponteiro já solto */ }
+  });
+
+  folha.addEventListener('pointermove', (e) => {
+    if (!lado) return;
+    const r = folha.getBoundingClientRect();
+    const fx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const fy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+
+    if (lado === 'esq') corte.esq = Math.min(fx, 1 - corte.dir - 0.1);
+    if (lado === 'dir') corte.dir = Math.min(1 - fx, 1 - corte.esq - 0.1);
+    if (lado === 'topo') corte.topo = Math.min(fy, 1 - corte.base - 0.1);
+    if (lado === 'base') corte.base = Math.min(1 - fy, 1 - corte.topo - 0.1);
+
+    for (const k of Object.keys(corte)) corte[k] = Math.max(0, corte[k]);
+    aplicarCaixa();
+  });
+
+  ['pointerup', 'pointercancel'].forEach((ev) =>
+    folha.addEventListener(ev, () => { lado = null; })
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Assinar: quadro de desenho e posicionamento
+ * ------------------------------------------------------------------ */
+
+/** Canto superior esquerdo da assinatura, em fração da página. */
+let assinatura = { x: 0.55, y: 0.72 };
+let imagemDaAssinatura = null;   // quando a pessoa manda uma foto em vez de desenhar
+let riscou = false;
+
+async function montarAssinatura(arquivos) {
+  assinatura = { x: 0.55, y: 0.72 };
+  imagemDaAssinatura = null;
+  riscou = false;
+  paginaDaPrevia = 1;
+
+  $('extra').hidden = false;
+  $('extra').innerHTML = `
+    <div class="pdf-assinar">
+      <span class="aj-titulo">1 · Desenhe a sua assinatura</span>
+      <canvas class="pdf-prancheta" id="prancheta" width="640" height="200"></canvas>
+      <div class="pdf-previa-pe">
+        <button class="btn ghost" id="asLimpar" type="button">Apagar e refazer</button>
+        <button class="btn ghost" id="asImagem" type="button">Usar uma foto</button>
+        <input type="file" id="asArquivo" accept="image/*" hidden />
+      </div>
+    </div>
+
+    <div class="pdf-assinar">
+      <span class="aj-titulo">2 · Arraste para o lugar certo</span>
+      <div class="pdf-previa">
+        <div class="pdf-folha" id="folha">
+          <img class="pdf-carimbo" id="carimbo" alt="" hidden />
+        </div>
+        <div class="pdf-previa-pe">
+          <button class="btn ghost" data-ir="-1" type="button">‹</button>
+          <span id="previaConta">—</span>
+          <button class="btn ghost" data-ir="1" type="button">›</button>
+        </div>
+      </div>
+    </div>`;
+
+  await trocarPagina(arquivos[0], 1);
+  prepararPrancheta();
+  posicionarCarimbo();
+
+  $('extra').addEventListener('click', async (e) => {
+    const ir = e.target.closest('[data-ir]');
+    if (ir) {
+      await trocarPagina(arquivos[0], paginaDaPrevia + Number(ir.dataset.ir));
+      posicionarCarimbo();
+    }
+    if (e.target.id === 'asLimpar') limparPrancheta();
+    if (e.target.id === 'asImagem') $('asArquivo').click();
+  });
+
+  $('asArquivo').addEventListener('change', async () => {
+    const f = $('asArquivo').files[0];
+    if (!f) return;
+    imagemDaAssinatura = await recortarTinta(await createImageBitmap(f));
+    riscou = true;
+    desenharNaPrancheta();
+    atualizarCarimbo();
+  });
+
+  $('asTamanho').addEventListener('input', () => {
+    $('asTamanhoVal').textContent = $('asTamanho').value + '%';
+    posicionarCarimbo();
+  });
+
+  arrastarCarimbo();
+}
+
+/**
+ * A prancheta guarda tinta com FUNDO TRANSPARENTE, e o branco que se vê vem do
+ * CSS. Se o fundo fosse pintado, a assinatura chegaria no documento dentro de
+ * um retângulo branco, tapando o que estivesse embaixo — que é exatamente o
+ * problema com assinatura escaneada de celular.
+ */
+function prepararPrancheta() {
+  const cv = $('prancheta');
+  const ctx = cv.getContext('2d');
+  ctx.lineWidth = 3.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#0b1020';
+
+  let riscando = false;
+  let ultimo = null;
+
+  const ponto = (e) => {
+    const r = cv.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * (cv.width / r.width),
+      y: (e.clientY - r.top) * (cv.height / r.height),
+    };
+  };
+
+  cv.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch { /* ponteiro já solto */ }
+    imagemDaAssinatura = null;   // desenhar à mão descarta a foto escolhida antes
+    riscando = true;
+    riscou = true;
+    ultimo = ponto(e);
+    ctx.beginPath();
+    ctx.moveTo(ultimo.x, ultimo.y);
+    ctx.lineTo(ultimo.x + 0.01, ultimo.y);
+    ctx.stroke();
+  });
+
+  cv.addEventListener('pointermove', (e) => {
+    if (!riscando) return;
+    const p = ponto(e);
+    ctx.beginPath();
+    ctx.moveTo(ultimo.x, ultimo.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ultimo = p;
+  });
+
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) =>
+    cv.addEventListener(ev, () => {
+      if (!riscando) return;
+      riscando = false;
+      atualizarCarimbo();
+    })
+  );
+}
+
+function limparPrancheta() {
+  const cv = $('prancheta');
+  cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  imagemDaAssinatura = null;
+  riscou = false;
+  $('carimbo').hidden = true;
+}
+
+function desenharNaPrancheta() {
+  const cv = $('prancheta');
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!imagemDaAssinatura) return;
+  const k = Math.min(cv.width / imagemDaAssinatura.width, cv.height / imagemDaAssinatura.height);
+  const w = imagemDaAssinatura.width * k;
+  const h = imagemDaAssinatura.height * k;
+  ctx.drawImage(imagemDaAssinatura, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+}
+
+/**
+ * Tira o fundo claro de uma assinatura fotografada e corta a folga em volta.
+ *
+ * Sem isto, a foto entra no documento como um retângulo de papel por cima do
+ * texto. O limiar é alto de propósito: papel branco fotografado quase nunca é
+ * branco puro, e cortar só em 255 não removeria nada.
+ */
+async function recortarTinta(bitmap) {
+  const cv = document.createElement('canvas');
+  cv.width = bitmap.width;
+  cv.height = bitmap.height;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bitmap, 0, 0);
+
+  const d = ctx.getImageData(0, 0, cv.width, cv.height);
+  let x0 = cv.width, y0 = cv.height, x1 = 0, y1 = 0, tinta = 0;
+
+  for (let i = 0; i < d.data.length; i += 4) {
+    const lum = (d.data[i] + d.data[i + 1] + d.data[i + 2]) / 3;
+    if (lum > 190) {
+      d.data[i + 3] = 0;            // fundo vira transparente
+    } else {
+      tinta++;
+      const p = i / 4;
+      const x = p % cv.width;
+      const y = Math.floor(p / cv.width);
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  ctx.putImageData(d, 0, 0);
+  if (!tinta) return await createImageBitmap(cv);
+
+  const folga = 6;
+  x0 = Math.max(0, x0 - folga); y0 = Math.max(0, y0 - folga);
+  x1 = Math.min(cv.width - 1, x1 + folga); y1 = Math.min(cv.height - 1, y1 + folga);
+
+  const corte2 = document.createElement('canvas');
+  corte2.width = x1 - x0 + 1;
+  corte2.height = y1 - y0 + 1;
+  corte2.getContext('2d').drawImage(cv, x0, y0, corte2.width, corte2.height, 0, 0, corte2.width, corte2.height);
+  return await createImageBitmap(corte2);
+}
+
+/** O PNG que vai para o documento, já sem a folga em volta da tinta. */
+async function pngDaAssinatura() {
+  if (!riscou) return null;
+  const cv = $('prancheta');
+  const bitmap = await createImageBitmap(cv);
+  const limpo = await recortarTinta(bitmap);
+
+  const saida = document.createElement('canvas');
+  saida.width = limpo.width;
+  saida.height = limpo.height;
+  saida.getContext('2d').drawImage(limpo, 0, 0);
+  const blob = await new Promise((r) => saida.toBlob(r, 'image/png'));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function atualizarCarimbo() {
+  const png = await pngDaAssinatura();
+  const img = $('carimbo');
+  if (!png || !img) return;
+  if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+  const url = URL.createObjectURL(new Blob([png], { type: 'image/png' }));
+  img.dataset.url = url;
+  img.src = url;
+  img.hidden = false;
+  posicionarCarimbo();
+}
+
+function posicionarCarimbo() {
+  const img = $('carimbo');
+  if (!img) return;
+  img.style.left = (assinatura.x * 100) + '%';
+  img.style.top = (assinatura.y * 100) + '%';
+  img.style.width = ($('asTamanho') ? Number($('asTamanho').value) : 28) + '%';
+}
+
+function arrastarCarimbo() {
+  const folha = $('folha');
+  const img = $('carimbo');
+  if (!folha || !img) return;
+  let pegou = null;
+
+  img.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { img.setPointerCapture(e.pointerId); } catch { /* ponteiro já solto */ }
+    const r = folha.getBoundingClientRect();
+    const c = img.getBoundingClientRect();
+    // Guarda onde DENTRO da assinatura a pessoa pegou, senão ela pula para
+    // debaixo do cursor no primeiro movimento.
+    pegou = { dx: (e.clientX - c.left) / r.width, dy: (e.clientY - c.top) / r.height };
+  });
+
+  img.addEventListener('pointermove', (e) => {
+    if (!pegou) return;
+    const r = folha.getBoundingClientRect();
+    assinatura.x = Math.min(0.99, Math.max(0, (e.clientX - r.left) / r.width - pegou.dx));
+    assinatura.y = Math.min(0.99, Math.max(0, (e.clientY - r.top) / r.height - pegou.dy));
+    posicionarCarimbo();
+  });
+
+  ['pointerup', 'pointercancel'].forEach((ev) =>
+    img.addEventListener(ev, () => { pegou = null; })
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Comparar: a lista do que mudou
+ * ------------------------------------------------------------------ */
+function mostrarComparacao(paginas) {
+  $('extra').hidden = false;
+  $('extra').innerHTML = '<span class="aj-titulo">O que mudou</span>'
+    + '<div class="pdf-diferencas">'
+    + paginas.map((p) => {
+      if (p.so) {
+        return '<div class="pdf-diferenca"><strong>Página ' + p.pagina + '</strong>'
+          + '<span>existe só no ' + (p.so === 'primeiro' ? 'arquivo antigo' : 'arquivo novo') + '</span></div>';
+      }
+      const pct = p.diferenca * 100;
+      if (pct < 0.05) {
+        return '<div class="pdf-diferenca igual"><strong>Página ' + p.pagina + '</strong><span>igual</span></div>';
+      }
+      const url = URL.createObjectURL(p.imagem);
+      return '<div class="pdf-diferenca"><strong>Página ' + p.pagina + '</strong>'
+        + '<span>' + pct.toFixed(pct < 1 ? 2 : 1) + '% da página mudou</span>'
+        + '<img src="' + url + '" alt="Página ' + p.pagina + ' com as mudanças em vermelho" /></div>';
+    }).join('')
+    + '</div>';
+}

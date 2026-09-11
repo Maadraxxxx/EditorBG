@@ -196,9 +196,14 @@ export async function numerarPaginas(arquivo, opcoes = {}) {
 
   doc.getPages().forEach((p, i) => {
     const { width } = p.getSize();
-    const texto = opcoes.formato === 'de'
-      ? (i + comeco) + ' de ' + (total + comeco - 1)
-      : String(i + comeco);
+    const n = i + comeco;
+
+    const texto =
+      opcoes.formato === 'de' ? n + ' de ' + (total + comeco - 1)
+        : opcoes.formato === 'romano' ? romano(n, true)
+          : opcoes.formato === 'romano-minusculo' ? romano(n, false)
+            : String(n);
+
     const largura = fonte.widthOfTextAtSize(texto, tamanho);
 
     const x = opcoes.posicao === 'esquerda' ? 40
@@ -400,4 +405,372 @@ export async function baixarVarios(itens, nomeZip) {
   // level 0: PDF e JPG já vêm comprimidos, e insistir só gasta tempo.
   const zip = zipSync(dentro, { level: 0 });
   baixar(new Blob([zip], { type: 'application/zip' }), nomeZip);
+}
+
+/* ------------------------------------------------------------------ *
+ * Numeração em romanos
+ * ------------------------------------------------------------------ */
+
+/**
+ * Romano de verdade, com a regra subtrativa: 4 é IV e não IIII, 9 é IX e não
+ * VIIII. A tabela já traz os casos subtrativos como se fossem símbolos, que é
+ * o jeito de resolver isso sem uma pilha de condições.
+ */
+const ROMANOS = [
+  [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+  [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+  [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+];
+
+export function romano(n, maiusculo = true) {
+  let resto = Math.max(1, Math.floor(n));
+  let saida = '';
+  for (const [valor, simbolo] of ROMANOS) {
+    while (resto >= valor) { saida += simbolo; resto -= valor; }
+  }
+  return maiusculo ? saida : saida.toLowerCase();
+}
+
+/* ------------------------------------------------------------------ *
+ * Prévia de uma página — compartilhada por recortar e assinar
+ * ------------------------------------------------------------------ */
+
+/**
+ * Desenha UMA página num canvas, para a pessoa ver onde está mexendo.
+ *
+ * Recortar às cegas, escrevendo margens em números, é como cortar papel de
+ * olhos fechados: só dá para saber se acertou depois de baixar. Com a página
+ * na tela, a moldura mostra o resultado antes.
+ */
+export async function renderizarPagina(arquivo, numero = 1, larguraAlvo = 520) {
+  const J = await leitor();
+  const doc = await J.getDocument({ data: await bytesDe(arquivo) }).promise;
+  const pagina = await doc.getPage(Math.min(Math.max(1, numero), doc.numPages));
+
+  const natural = pagina.getViewport({ scale: 1 });
+  const vista = pagina.getViewport({ scale: larguraAlvo / natural.width });
+
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(vista.width);
+  cv.height = Math.round(vista.height);
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  await pagina.render({ canvasContext: ctx, viewport: vista, canvas: cv }).promise;
+
+  return { canvas: cv, paginas: doc.numPages, largura: natural.width, altura: natural.height };
+}
+
+/* ------------------------------------------------------------------ *
+ * Recortar
+ * ------------------------------------------------------------------ */
+
+/**
+ * Corta as margens. As sobras chegam em FRAÇÃO de cada lado, não em pontos:
+ * assim a mesma escolha vale para páginas de tamanhos diferentes no mesmo
+ * documento, e a moldura da tela — que trabalha em porcentagem — não precisa
+ * converter nada.
+ *
+ * Mexe no CropBox e não no MediaBox de propósito: o conteúdo continua lá,
+ * apenas fora da área visível, e um corte errado pode ser desfeito depois.
+ */
+export async function recortar(arquivo, sobras, texto) {
+  const doc = await abrir(arquivo);
+  const total = doc.getPageCount();
+  const alvo = texto && texto.trim() ? new Set(lerIntervalos(texto, total)) : null;
+
+  const { esq = 0, dir = 0, topo = 0, base = 0 } = sobras;
+  if (esq + dir >= 0.95 || topo + base >= 0.95) {
+    throw new Error('O corte não deixou quase nada de página. Diminua as margens.');
+  }
+
+  doc.getPages().forEach((p, i) => {
+    if (alvo && !alvo.has(i + 1)) return;
+    const caixa = p.getCropBox();
+    p.setCropBox(
+      caixa.x + caixa.width * esq,
+      caixa.y + caixa.height * base,
+      caixa.width * (1 - esq - dir),
+      caixa.height * (1 - topo - base),
+    );
+  });
+  return comoPdf(await doc.save());
+}
+
+/* ------------------------------------------------------------------ *
+ * Assinar
+ * ------------------------------------------------------------------ */
+
+/**
+ * Coloca uma imagem — a assinatura desenhada ou fotografada — sobre a página.
+ *
+ * Isto NÃO é assinatura digital com certificado: é o equivalente a escrever à
+ * caneta e digitalizar. Serve para o que a maioria das pessoas precisa, e a
+ * tela diz isso com todas as letras, porque prometer validade jurídica que não
+ * existe seria pior do que não ter a ferramenta.
+ *
+ * Posição e tamanho vêm em fração da página, pelo mesmo motivo do recorte.
+ */
+export async function assinar(arquivo, pngBytes, onde) {
+  const doc = await abrir(arquivo);
+  const imagem = await doc.embedPng(pngBytes);
+  const total = doc.getPageCount();
+
+  const numeros = onde.todas
+    ? Array.from({ length: total }, (_, i) => i + 1)
+    : [Math.min(Math.max(1, onde.pagina || 1), total)];
+
+  for (const n of numeros) {
+    const p = doc.getPage(n - 1);
+    const { width, height } = p.getSize();
+    const larg = width * (onde.largura || 0.28);
+    const alt = larg * (imagem.height / imagem.width);
+
+    p.drawImage(imagem, {
+      x: width * onde.x,
+      // A fração vem do topo, como na tela; o PDF conta do rodapé.
+      y: height * (1 - onde.y) - alt,
+      width: larg,
+      height: alt,
+    });
+  }
+  return comoPdf(await doc.save());
+}
+
+/* ------------------------------------------------------------------ *
+ * Comparar
+ * ------------------------------------------------------------------ */
+
+/**
+ * Compara dois PDFs página a página, por pixel.
+ *
+ * Comparar o texto extraído acharia trocas de palavra, mas não veria carimbo
+ * movido, assinatura acrescentada, tabela redesenhada nem logotipo trocado —
+ * e é justamente isso que se procura ao conferir duas versões de um contrato.
+ * Por pixel, qualquer mudança visível aparece.
+ *
+ * As duas páginas são desenhadas na MESMA largura antes da conta: um PDF
+ * gerado com escala diferente acusaria o documento inteiro como alterado.
+ */
+export async function comparar(arquivoA, arquivoB, aoProgredir = () => {}) {
+  const J = await leitor();
+  const a = await J.getDocument({ data: await bytesDe(arquivoA) }).promise;
+  const b = await J.getDocument({ data: await bytesDe(arquivoB) }).promise;
+  const total = Math.max(a.numPages, b.numPages);
+  const LARGURA = 700;
+
+  async function desenhar(doc, n) {
+    if (n > doc.numPages) return null;
+    const pagina = await doc.getPage(n);
+    const natural = pagina.getViewport({ scale: 1 });
+    const vista = pagina.getViewport({ scale: LARGURA / natural.width });
+    const cv = document.createElement('canvas');
+    cv.width = LARGURA;
+    cv.height = Math.round(vista.height);
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    await pagina.render({ canvasContext: ctx, viewport: vista, canvas: cv }).promise;
+    return cv;
+  }
+
+  const resultados = [];
+
+  for (let n = 1; n <= total; n++) {
+    const ca = await desenhar(a, n);
+    const cb = await desenhar(b, n);
+    aoProgredir(n / total, n, total);
+
+    if (!ca || !cb) {
+      resultados.push({ pagina: n, so: ca ? 'primeiro' : 'segundo', diferenca: 1 });
+      continue;
+    }
+
+    const alturaComum = Math.min(ca.height, cb.height);
+    const pa = ca.getContext('2d').getImageData(0, 0, LARGURA, alturaComum).data;
+    const pb = cb.getContext('2d').getImageData(0, 0, LARGURA, alturaComum).data;
+
+    const marca = document.createElement('canvas');
+    marca.width = LARGURA;
+    marca.height = cb.height;
+    const mctx = marca.getContext('2d');
+    mctx.drawImage(cb, 0, 0);
+    const capa = mctx.getImageData(0, 0, LARGURA, alturaComum);
+
+    let diferentes = 0;
+    for (let i = 0; i < pa.length; i += 4) {
+      // Soma dos três canais, com 30 de folga: o antisserrilhado do texto nunca
+      // sai idêntico entre duas renderizações, e sem folga o documento inteiro
+      // apareceria como diferente.
+      const d = Math.abs(pa[i] - pb[i])
+        + Math.abs(pa[i + 1] - pb[i + 1])
+        + Math.abs(pa[i + 2] - pb[i + 2]);
+      if (d > 30) {
+        diferentes++;
+        capa.data[i] = 244; capa.data[i + 1] = 63; capa.data[i + 2] = 94;
+      }
+    }
+    mctx.putImageData(capa, 0, 0);
+
+    resultados.push({
+      pagina: n,
+      diferenca: diferentes / (pa.length / 4),
+      imagem: await new Promise((r) => marca.toBlob(r, 'image/png')),
+    });
+  }
+  return resultados;
+}
+
+/* ------------------------------------------------------------------ *
+ * Markdown
+ * ------------------------------------------------------------------ */
+
+/**
+ * Texto com a estrutura recuperada pelo TAMANHO DA LETRA.
+ *
+ * O PDF não guarda "isto é um título": guarda letras com posição e corpo. Mas
+ * título quase sempre é escrito maior que o corpo do texto, e é nisso que dá
+ * para se apoiar. A referência é a MEDIANA dos tamanhos da página — não a
+ * média, que um título gigante sozinho puxaria para cima, fazendo o próprio
+ * título deixar de se destacar.
+ */
+export async function paraMarkdown(arquivo) {
+  const J = await leitor();
+  const doc = await J.getDocument({ data: await bytesDe(arquivo) }).promise;
+  const saida = [];
+
+  for (let n = 1; n <= doc.numPages; n++) {
+    const pagina = await doc.getPage(n);
+    const conteudo = await pagina.getTextContent();
+
+    // Junta os pedaços em linhas, guardando o maior corpo de letra de cada uma.
+    const linhas = [];
+    let atual = null;
+    for (const item of conteudo.items) {
+      if (!item.str) continue;
+      const y = Math.round(item.transform[5]);
+      const corpo = Math.abs(item.transform[3]) || item.height || 0;
+      const negrito = /bold|black|heavy/i.test(item.fontName || '');
+
+      if (!atual || Math.abs(y - atual.y) > 2) {
+        if (atual) linhas.push(atual);
+        atual = { y, texto: '', corpo, negrito };
+      }
+      atual.texto += item.str;
+      atual.corpo = Math.max(atual.corpo, corpo);
+      atual.negrito = atual.negrito && negrito;
+      if (item.hasEOL) { linhas.push(atual); atual = null; }
+    }
+    if (atual) linhas.push(atual);
+
+    const uteis = linhas.filter((l) => l.texto.trim());
+    if (!uteis.length) continue;
+
+    // A referência é o tamanho em que está escrita a MAIOR QUANTIDADE DE TEXTO,
+    // não a mediana das linhas. Numa página com quatro linhas, das quais duas
+    // são títulos, a mediana cai em cima de um título — e aí o próprio título
+    // vira a régua e deixa de se destacar. Contando caracteres, o corpo do
+    // texto ganha sempre, porque é onde está o volume.
+    const porTamanho = new Map();
+    for (const l of uteis) {
+      const chave = Math.round(l.corpo * 2) / 2;   // meio ponto de tolerância
+      porTamanho.set(chave, (porTamanho.get(chave) || 0) + l.texto.trim().length);
+    }
+    let base = 1;
+    let maior = -1;
+    for (const [tamanho, letras] of porTamanho) {
+      if (letras > maior) { maior = letras; base = tamanho; }
+    }
+
+    // O nível sai da ORDEM dos tamanhos, não de razões fixas. Num documento com
+    // título de 30 e subtítulo de 18 sobre corpo de 12, as razões são 2,5 e 1,5
+    // — qualquer corte fixo entre elas funciona neste documento e erra no
+    // próximo. Ordenando, o maior é sempre #, o seguinte sempre ##.
+    const niveis = new Map();
+    [...porTamanho.keys()]
+      .filter((t) => t > base * 1.08)
+      .sort((x, y) => y - x)
+      .forEach((t, i) => niveis.set(t, '#'.repeat(Math.min(3, i + 1))));
+
+    for (const l of uteis) {
+      const texto = l.texto.trim();
+      const nivel = niveis.get(Math.round(l.corpo * 2) / 2);
+
+      if (nivel) saida.push(nivel + ' ' + texto);
+      else if (/^[•·▪◦-]\s+/.test(texto)) {
+        saida.push('- ' + texto.replace(/^[•·▪◦-]\s+/, ''));
+      } else if (/^\d+[.)]\s+/.test(texto)) saida.push(texto);
+      else if (l.negrito) saida.push('**' + texto + '**');
+      else saida.push(texto);
+    }
+    // Separador de página: ajuda quem for reler a saber de onde veio cada parte.
+    if (n < doc.numPages) saida.push('---');
+  }
+
+  return saida.join('\n\n').replace(/\n{4,}/g, '\n\n\n');
+}
+
+/* ------------------------------------------------------------------ *
+ * OCR
+ * ------------------------------------------------------------------ */
+
+let ocrPromise = null;
+function ocrLib() {
+  if (!ocrPromise) ocrPromise = import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/+esm');
+  return ocrPromise;
+}
+
+/**
+ * Lê o texto de um PDF digitalizado e devolve um PDF PESQUISÁVEL.
+ *
+ * A página continua exatamente a mesma imagem de antes; o que entra é uma
+ * camada de texto invisível por baixo, alinhada com o que está desenhado. É
+ * assim que o documento passa a aceitar busca e cópia sem mudar de aparência.
+ *
+ * O modelo do idioma pesa uns 10 MB e é baixado na primeira vez — por isso
+ * esta é a única ferramenta da página que avisa antes de começar.
+ */
+export async function ocr(arquivo, opcoes = {}, aoProgredir = () => {}) {
+  const T = await ocrLib();
+  const paginas = await paraImagens(
+    arquivo,
+    { escala: opcoes.escala || 2, tipo: 'png' },
+    (f) => aoProgredir(f * 0.25, 'preparando'),
+  );
+
+  aoProgredir(0.25, 'baixando');
+  const trabalhador = await T.createWorker(opcoes.idioma || 'por', 1, {
+    workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+    langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+  });
+
+  try {
+    const textos = [];
+    const pdfs = [];
+
+    for (let i = 0; i < paginas.length; i++) {
+      const r = await trabalhador.recognize(paginas[i].blob, {}, { text: true, pdf: true });
+      textos.push((r.data.text || '').trim());
+      if (r.data.pdf) pdfs.push(new Uint8Array(r.data.pdf));
+      aoProgredir(0.3 + ((i + 1) / paginas.length) * 0.7, 'lendo', i + 1, paginas.length);
+    }
+
+    // O tesseract devolve um PDF por página; juntar aqui evita entregar um zip
+    // com dezenas de arquivos de uma página cada.
+    const { PDFDocument } = await lib();
+    const saida = await PDFDocument.create();
+    for (const bytes of pdfs) {
+      const parte = await PDFDocument.load(bytes);
+      const copiadas = await saida.copyPages(parte, parte.getPageIndices());
+      for (const p of copiadas) saida.addPage(p);
+    }
+
+    return {
+      texto: textos.join('\n\n'),
+      pdf: pdfs.length ? comoPdf(await saida.save()) : null,
+    };
+  } finally {
+    await trabalhador.terminate();
+  }
 }

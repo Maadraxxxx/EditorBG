@@ -2413,3 +2413,99 @@ body[data-mode="pdf"] main { max-width: 1320px; }
   outline-offset: 6px;
   border-radius: 12px;
 }
+
+/* ---------- prévia da página: recortar e assinar ---------- */
+.pdf-extra { display: grid; gap: 16px; }
+.pdf-extra:empty { display: none; }
+
+.pdf-previa { display: grid; justify-items: center; gap: 10px; }
+
+.pdf-folha {
+  position: relative;
+  /* touch-action none porque arrastar a moldura no celular precisa competir
+     com o gesto de rolar a página, e o navegador dá a vitória ao gesto. */
+  touch-action: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(20, 26, 39, .12);
+  background: #fff;
+}
+.pdf-folha canvas { display: block; }
+
+.pdf-corte {
+  position: absolute;
+  border: 2px solid var(--accent);
+  /* A sombra gigante para fora escurece tudo o que vai ser cortado, sem
+     precisar de quatro divs cobrindo as bordas. */
+  box-shadow: 0 0 0 4000px rgba(20, 26, 39, .45);
+  cursor: move;
+}
+
+.pdf-alca {
+  position: absolute;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.pdf-alca[data-lado="topo"], .pdf-alca[data-lado="base"] {
+  left: 50%; width: 42px; height: 7px; margin-left: -21px; cursor: ns-resize;
+}
+.pdf-alca[data-lado="topo"] { top: -4px; }
+.pdf-alca[data-lado="base"] { bottom: -4px; }
+.pdf-alca[data-lado="esq"], .pdf-alca[data-lado="dir"] {
+  top: 50%; height: 42px; width: 7px; margin-top: -21px; cursor: ew-resize;
+}
+.pdf-alca[data-lado="esq"] { left: -4px; }
+.pdf-alca[data-lado="dir"] { right: -4px; }
+
+.pdf-previa-pe {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12.5px; color: var(--muted);
+}
+.pdf-previa-pe .btn { padding: 6px 12px; }
+
+/* ---------- assinar ---------- */
+.pdf-assinar { display: grid; gap: 10px; }
+
+.pdf-prancheta {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 640 / 200;
+  touch-action: none;
+  cursor: crosshair;
+  /* O branco vem daqui e não do canvas: a tinta precisa sair com fundo
+     transparente, senão a assinatura entra no documento dentro de um
+     retângulo branco tapando o que estiver embaixo. */
+  background: #fff;
+  border: 1px dashed var(--line-forte);
+  border-radius: 12px;
+}
+
+.pdf-carimbo {
+  position: absolute;
+  cursor: grab;
+  touch-action: none;
+  outline: 1px dashed rgba(91, 94, 240, .6);
+  outline-offset: 3px;
+}
+.pdf-carimbo:active { cursor: grabbing; }
+
+/* ---------- comparar ---------- */
+.pdf-diferencas { display: grid; gap: 14px; }
+.pdf-diferenca {
+  display: grid; gap: 6px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.pdf-diferenca strong { font-size: 13.5px; }
+.pdf-diferenca span { color: var(--muted); font-size: 12.5px; }
+.pdf-diferenca img {
+  width: 100%; height: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pdf-diferenca.igual { opacity: .6; }
