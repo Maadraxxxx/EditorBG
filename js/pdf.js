@@ -2098,46 +2098,67 @@ export async function tradutorJaBaixado() {
 /** Quanto o modelo pesa, em MB. Medido nos arquivos que o dtype q8 baixa. */
 export const PESO_DO_TRADUTOR = 110;
 
-let tradutorPromise = null;
-let tradutorCarregado = null;
-
 /**
- * Carrega o modelo de tradução que roda no navegador.
+ * Conversa com o worker que carrega e roda o modelo de tradução.
  *
- * É o `opus-mt-mul-en`, e a escolha dele veio de medição, não de gosto: o
- * modelo que traduz para QUALQUER idioma pesa 603 MB, e eu vi esse arquivo não
- * ser gravado no cache do navegador — ou seja, seriam 603 MB a cada uso, não
- * uma vez. Prometer "baixa uma vez e fica guardado" sobre um arquivo que não
- * fica guardado seria mentira.
- *
- * Este pesa 107 MB, cabe no cache com folga e traduz de muitos idiomas PARA O
- * INGLÊS. É menos do que se queria, mas é o que funciona de verdade — e a tela
- * diz exatamente isso em vez de oferecer destinos que não vai entregar.
+ * Todo o peso mora lá: aqui só saem mensagens e entram respostas, então a
+ * página continua respondendo enquanto os 107 MB baixam e a inferência roda.
+ * Na thread principal isso congelava a tela inteira, e a barra de progresso
+ * nem se redesenhava — de fora parecia um modelo que nunca carregava.
  */
-async function modeloDeTraducao(aoProgredir) {
-  if (tradutorCarregado) return tradutorCarregado;
-  if (!tradutorPromise) {
-    tradutorPromise = (async () => {
-      const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1');
-      env.allowLocalModels = false;
+let trabalhadorIA = null;
+const pendentesIA = new Map();
+let aoBaixarIA = null;
+let proximoPedido = 1;
+let carregandoIA = null;
 
-      // Processador e não placa de vídeo: o caminho da GPU não terminou de
-      // carregar em nenhum teste daqui. Entre um caminho medido e funcionando e
-      // outro que talvez seja mais rápido mas trava, vale o que funciona.
-      const p = await pipeline('translation', 'Xenova/opus-mt-mul-en', {
-        device: 'wasm',
-        dtype: 'q8',
-        progress_callback: (e) => {
-          if (e.status === 'progress' && e.total) aoProgredir(e.loaded / e.total, 'baixando');
-        },
-      });
-      tradutorCarregado = p;
-      return p;
-    })();
-    tradutorPromise.catch(() => { tradutorPromise = null; });
-  }
-  return tradutorPromise;
+function obterTrabalhadorIA() {
+  if (trabalhadorIA) return trabalhadorIA;
+
+  trabalhadorIA = new Worker(new URL('./pdf-worker.js', import.meta.url), { type: 'module' });
+
+  trabalhadorIA.onmessage = (e) => {
+    const m = e.data || {};
+    if (m.tipo === 'baixando') { if (aoBaixarIA) aoBaixarIA(m.fracao); return; }
+
+    const chave = m.tipo === 'carregado' ? 'carregar' : m.id;
+    const espera = pendentesIA.get(chave);
+    if (!espera) return;
+    pendentesIA.delete(chave);
+
+    if (m.tipo === 'erro') espera.rejeitar(new Error(m.mensagem));
+    else espera.resolver(m);
+  };
+
+  trabalhadorIA.onerror = (e) => {
+    for (const { rejeitar } of pendentesIA.values()) {
+      rejeitar(new Error('Falha ao carregar o tradutor: ' + (e.message || 'erro desconhecido')));
+    }
+    pendentesIA.clear();
+    // Worker quebrado nao pode ficar guardado: a proxima tentativa recria.
+    trabalhadorIA = null;
+    carregandoIA = null;
+  };
+
+  return trabalhadorIA;
 }
+
+function pedirAoTrabalhadorIA(mensagem, chave) {
+  return new Promise((resolver, rejeitar) => {
+    pendentesIA.set(chave, { resolver, rejeitar });
+    obterTrabalhadorIA().postMessage(mensagem);
+  });
+}
+
+function carregarTradutor(aoProgredirDownload) {
+  aoBaixarIA = aoProgredirDownload;
+  if (carregandoIA) return carregandoIA;
+  carregandoIA = pedirAoTrabalhadorIA({ tipo: 'carregar' }, 'carregar');
+  carregandoIA.catch(() => { carregandoIA = null; });
+  return carregandoIA;
+}
+
+
 
 /** O tradutor embutido do navegador, quando existe: instantâneo e sem download. */
 async function tradutorDoNavegador(de, para) {
@@ -2202,21 +2223,20 @@ export async function traduzir(texto, de, para, aoProgredir = () => {}) {
   }
 
   aoProgredir(0, 'baixando');
-  const modelo = await modeloDeTraducao((f) => aoProgredir(f, 'baixando'));
+  await carregarTradutor((f) => aoProgredir(f, 'baixando'));
 
-  // Frase a frase, e não parágrafo inteiro: o modelo tem teto de entrada curto,
-  // e um parágrafo grande sai truncado no meio sem aviso nenhum.
+  // Frase a frase: o modelo tem teto de entrada curto, e um paragrafo inteiro
+  // sai truncado no meio sem aviso nenhum. O corte acontece no worker.
   for (let i = 0; i < pedacos.length; i++) {
     const frases = emFrases(pedacos[i]);
-    const traduzidas = [];
-    for (const frase of (frases.length ? frases : [pedacos[i]])) {
-      const r = await modelo(frase);
-      traduzidas.push((r[0] && r[0].translation_text) || '');
-    }
-    saida.push(traduzidas.join(' '));
+    const r = await pedirAoTrabalhadorIA(
+      { tipo: 'traduzir', id: proximoPedido, frases: frases.length ? frases : [pedacos[i]] },
+      proximoPedido++,
+    );
+    saida.push(r.texto);
     aoProgredir((i + 1) / pedacos.length, 'traduzindo', i + 1, pedacos.length);
   }
-  return saida.join('\n\n');
+  return saida.join(String.fromCharCode(10, 10));
 }
 
 /**
