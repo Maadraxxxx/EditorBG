@@ -19,6 +19,17 @@ let atual = null;       // canvas com o resultado
 let nomeArquivo = 'imagem';
 let usouCota = false;   // a cota é gasta uma vez por imagem, não por ajuste
 
+/**
+ * Placa de vídeo ou processador. Começa no processador porque é a resposta
+ * pessimista: prometer um tempo e estourar é pior do que prometer e entregar
+ * antes. Quando a resposta real chega, o aviso na tela se refaz sozinho.
+ */
+let motor = 'wasm';
+M.dispositivoProvavel().then((d) => {
+  motor = d;
+  if (original) prepararIA();
+});
+
 /* ------------------------------------------------------------------ *
  * Entrada
  * ------------------------------------------------------------------ */
@@ -246,7 +257,7 @@ function semCota(limite) {
  * Ampliação com IA
  * ------------------------------------------------------------------ */
 function prepararIA() {
-  const segundos = M.estimarSegundos(original.width, original.height);
+  const segundos = M.estimarSegundos(original.width, original.height, motor);
   const nota = $('iaNota');
 
   $('botaoIA').disabled = false;
@@ -309,7 +320,7 @@ $('botaoIA').addEventListener('click', async () => {
   if (!original) return;
 
   const botao = $('botaoIA');
-  const segundos = M.estimarSegundos(original.width, original.height);
+  const segundos = M.estimarSegundos(original.width, original.height, motor);
 
   // Espera longa merece confirmação. Começar sem avisar e a pessoa descobrir
   // dez minutos depois é o pior desfecho possível aqui.
@@ -325,6 +336,14 @@ $('botaoIA').addEventListener('click', async () => {
 
   try {
     const dobrado = await M.comIA(original, (fase, fracao, info) => {
+      // O motor que realmente pegou pode não ser o previsto — GPU reconhecida
+      // que recusa o modelo cai no processador. Guarda o verdadeiro para as
+      // próximas estimativas desta sessão não repetirem a conta errada.
+      if (fase === 'motor') {
+        if (info && info.dispositivo) motor = info.dispositivo;
+        return;
+      }
+
       $('iaPreenche').style.width = Math.round(fracao * 100) + '%';
 
       if (fase === 'baixando') {

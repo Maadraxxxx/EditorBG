@@ -24,6 +24,22 @@ env.allowLocalModels = false;
 const MODELO = 'Xenova/swin2SR-lightweight-x2-64';
 
 let modelo = null;
+let dispositivo = null;   // 'webgpu' ou 'wasm', decidido no carregamento
+
+/**
+ * `navigator.gpu` existir não garante WebGPU: em muitos PCs o adapter não é
+ * concedido. Só uma requisição real responde isso. Mesma checagem do
+ * segment.js — a decisão precisa ser tomada aqui dentro porque o worker tem
+ * o próprio `navigator`.
+ */
+async function temGpu() {
+  if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
+  try {
+    return !!(await navigator.gpu.requestAdapter());
+  } catch {
+    return false;
+  }
+}
 
 /** O modelo devolve 3 canais; o canvas quer 4. */
 function paraRGBA(img) {
@@ -44,16 +60,39 @@ self.onmessage = async (e) => {
   try {
     if (msg.tipo === 'carregar') {
       if (!modelo) {
-        modelo = await pipeline('image-to-image', MODELO, {
-          dtype: 'q8',
-          progress_callback: (p) => {
-            if (p && p.status === 'progress' && p.total) {
-              self.postMessage({ tipo: 'baixando', fracao: p.loaded / p.total });
-            }
-          },
-        });
+        const aviso = (p) => {
+          if (p && p.status === 'progress' && p.total) {
+            self.postMessage({ tipo: 'baixando', fracao: p.loaded / p.total });
+          }
+        };
+
+        // A placa de vídeo faz o mesmo ladrilho em cerca de um terço do tempo
+        // do processador: medido nesta máquina, 11,8 s no CPU contra 4,0 s na
+        // GPU, por ladrilho de 192px. Sem pedir a GPU, mesmo quem tem uma
+        // esperava o triplo à toa — que é a maior parte da lentidão em
+        // computador fraco que ainda dá para resolver dentro do navegador.
+        if (await temGpu()) {
+          try {
+            modelo = await pipeline('image-to-image', MODELO, {
+              device: 'webgpu', dtype: 'fp32', progress_callback: aviso,
+            });
+            dispositivo = 'webgpu';
+          } catch (e) {
+            // GPU reconhecida mas incapaz de rodar o modelo (driver antigo,
+            // pouca memória de vídeo). Cair no processador é lento, mas é
+            // melhor do que a ferramenta simplesmente não funcionar.
+            modelo = null;
+          }
+        }
+
+        if (!modelo) {
+          modelo = await pipeline('image-to-image', MODELO, {
+            device: 'wasm', dtype: 'q8', progress_callback: aviso,
+          });
+          dispositivo = 'wasm';
+        }
       }
-      self.postMessage({ tipo: 'carregado' });
+      self.postMessage({ tipo: 'carregado', dispositivo });
       return;
     }
 

@@ -37,16 +37,48 @@ const LADRILHO = 192;
 const MARGEM = 16;
 
 /**
- * Custo medido: 0,32 ms por pixel de entrada. A margem faz cada ladrilho
- * processar mais pixels do que aproveita, e esse desperdício entra na conta —
- * senão a estimativa mentiria para baixo justamente nas imagens grandes, que
- * são as que precisam de aviso.
+ * Custo medido por pixel de entrada, num ladrilho de 192px: 0,32 ms no
+ * processador e 0,108 ms na placa de vídeo — quase três vezes mais rápido.
+ *
+ * São dois números e não um porque a mesma imagem leva tempos muito
+ * diferentes conforme a máquina tenha ou não WebGPU, e prometer o tempo do
+ * CPU para quem tem GPU (ou o contrário, pior ainda) quebra justamente o
+ * aviso que existe para a pessoa decidir se vale esperar.
+ *
+ * A margem faz cada ladrilho processar mais pixels do que aproveita, e esse
+ * desperdício entra na conta — senão a estimativa mentiria para baixo
+ * justamente nas imagens grandes, que são as que precisam de aviso.
+ *
+ * Os dois valores vieram de uma máquina só (GPU NVIDIA Pascal). Numa placa
+ * integrada fraca a vantagem é menor, então o número da GPU é otimista;
+ * por isso o padrão, quando não se sabe, é o do processador.
  */
-const MS_POR_PIXEL = 0.00032;
+const MS_POR_PIXEL = { wasm: 0.00032, webgpu: 0.000108 };
 const DESPERDICIO = ((LADRILHO + 2 * MARGEM) ** 2) / (LADRILHO ** 2);
 
-export function estimarSegundos(largura, altura) {
-  return Math.max(5, Math.round(largura * altura * MS_POR_PIXEL * DESPERDICIO));
+export function estimarSegundos(largura, altura, dispositivo) {
+  const porPixel = MS_POR_PIXEL[dispositivo] || MS_POR_PIXEL.wasm;
+  return Math.max(5, Math.round(largura * altura * porPixel * DESPERDICIO));
+}
+
+/**
+ * Qual motor a máquina vai usar. Checagem própria e não a do segment.js para
+ * não arrastar o transformers.js inteiro para esta página só por causa de uma
+ * pergunta de seis linhas.
+ */
+let gpuPromessa = null;
+export function dispositivoProvavel() {
+  if (!gpuPromessa) {
+    gpuPromessa = (async () => {
+      if (typeof navigator === 'undefined' || !('gpu' in navigator)) return 'wasm';
+      try {
+        return (await navigator.gpu.requestAdapter()) ? 'webgpu' : 'wasm';
+      } catch {
+        return 'wasm';
+      }
+    })();
+  }
+  return gpuPromessa;
 }
 
 /** "40 segundos", "cerca de 6 minutos" — para escrever na tela. */
@@ -464,7 +496,13 @@ function carregarIA(aoProgredirDownload) {
  */
 export async function comIA(fonte, aoProgredir = () => {}, deveParar = () => false) {
   aoProgredir('baixando', 0);
-  await carregarIA((fracao) => aoProgredir('baixando', Math.min(0.99, fracao)));
+  const carga = await carregarIA((fracao) => aoProgredir('baixando', Math.min(0.99, fracao)));
+
+  // Qual motor de fato pegou. Pode não ser o previsto: a GPU pode ter sido
+  // reconhecida e mesmo assim recusar o modelo, e aí o tempo real é o do
+  // processador. Quem chamou precisa saber para não continuar mostrando uma
+  // conta otimista até o fim.
+  if (carga && carga.dispositivo) aoProgredir('motor', 0, { dispositivo: carga.dispositivo });
 
   const entrada = paraCanvas(fonte);
   const saida = document.createElement('canvas');
