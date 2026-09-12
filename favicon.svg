@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    A marca do site, em duas plaquetas em vez das quatro do cabeçalho.
+
+    POR QUE DUAS: num ícone de aba o desenho aparece com 16 pixels de lado.
+    As quatro plaquetas do logo viram uma mancha nesse tamanho; duas ainda se
+    distinguem e já dizem o essencial — que aqui tem mais de uma ferramenta.
+    Era uma tesoura antes, e tesoura dizia "só removedor de fundo".
+  -->
+  <defs>
+    <linearGradient id="tras" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="frente" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="13" y="3" width="16" height="16" rx="4.5" fill="url(#tras)"/>
+  <!-- A borda clara separa as duas quando o fundo da aba é escuro. -->
+  <rect x="3" y="11" width="18" height="18" rx="5" fill="url(#frente)"
+        stroke="#ffffff" stroke-width="1.6"/>
+</svg>

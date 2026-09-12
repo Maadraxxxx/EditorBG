@@ -91,7 +91,7 @@ function pagina(b, outras) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapar(b.titulo)}</title>
   <meta name="description" content="${escapar(b.descricao)}" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#128196;</text></svg>" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="canonical" href="${url}" />
 
   <meta property="og:type" content="website" />
@@ -151,7 +151,7 @@ ${CABECALHO}
     <h2>Outras ferramentas</h2>
     <ul class="busca-relacionadas">
         ${relacionadas}
-        <li><a href="/pdf">Ver todas as 32 ferramentas de PDF</a></li>
+        <li><a href="/pdf">Ver todas as 30 ferramentas de PDF</a></li>
     </ul>
   </section>
 </main>
