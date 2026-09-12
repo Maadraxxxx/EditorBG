@@ -1682,7 +1682,12 @@ th.admin-c { text-align: center; }
   background: linear-gradient(180deg, rgba(99, 102, 241, .22), rgba(99, 102, 241, .07));
   color: var(--txt);
 }
-.hd-plano.is-escolhido .hd-plano-valor { color: #fff; }
+/* O valor do plano escolhido continua escuro.
+   Branco era resquício do tema escuro, quando o cartão selecionado tinha fundo
+   escuro; com o fundo claro de hoje o preço — que é a informação mais
+   importante do cartão — ficava quase invisível justamente no que está
+   selecionado. */
+.hd-plano.is-escolhido .hd-plano-valor { color: var(--txt); }
 
 /* Cabe uma fita só, no do meio. Duas já não destacariam nada. */
 .hd-plano-destaque { padding-top: 20px; }
