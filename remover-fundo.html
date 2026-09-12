@@ -104,6 +104,23 @@
       </label>
     </div>
 
+    <!-- Só aparece no celular: no computador o recorte local já é rápido, e
+         oferecer o servidor ali seria trocar privacidade por nada. -->
+    <div class="tool-group" id="grupoServidor" hidden>
+      <label class="tool-label">Recortar no servidor <span class="selo-vip">VIP</span></label>
+      <label class="switch">
+        <input type="checkbox" id="noServidor" />
+        <span class="track"><span class="knob"></span></span>
+        <span class="switch-text" id="noServidorTexto">Desligado</span>
+      </label>
+      <p class="hint">
+        Muito mais rápido em celular fraco. <strong>Ligando isto, a imagem é
+        enviada para o nosso servidor</strong>, usada só para fazer o recorte e
+        descartada na mesma hora — não é gravada em lugar nenhum. Desligado, o
+        recorte acontece no seu aparelho, como sempre.
+      </p>
+    </div>
+
     <p class="hint" id="modelHint"></p>
   </section>
 

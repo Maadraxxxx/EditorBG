@@ -3,9 +3,11 @@
  * Os modelos (ONNX) rodam via transformers.js, em WebGPU quando disponível.
  * Nenhuma imagem é enviada para servidores.
  */
+import { ehCelular } from './limites.js';
 import { compose, cloneCanvas, defaultEdit } from './compose.js';
 import { MODELS, loadSegmenter, segmentImage,
   aoTrocarMotor,
+  recortarNoServidor,
 } from './segment.js';
 import { openEditor } from './editor.js';
 import { refreshSliders } from './sliders.js';
@@ -100,6 +102,40 @@ function setEngine(state, label) {
  * Carrega (ou reaproveita) o segmentador do modelo escolhido. Trocar de modelo
  * descarrega o anterior: dois modelos grandes no mesmo heap estouram a memória.
  */
+/**
+ * Recortar no servidor: desligado por padrão, e só oferecido no celular.
+ *
+ * No computador o recorte local já é rápido, e oferecer o servidor ali seria
+ * trocar privacidade por nada. No celular fraco a conta é outra: a promessa de
+ * que o arquivo não sai do aparelho não vale nada para quem desiste antes de
+ * ver o resultado.
+ */
+let servidorLigado = false;
+
+if (ehCelular && $('grupoServidor')) {
+  $('grupoServidor').hidden = false;
+
+  $('noServidor').addEventListener('change', async () => {
+    const quer = $('noServidor').checked;
+    if (!quer) {
+      servidorLigado = false;
+      $('noServidorTexto').textContent = 'Desligado';
+      return;
+    }
+
+    const Paywall = await import('./paywall.js');
+    if (!Paywall.temHD()) {
+      // Desliga e mostra os planos, em vez de deixar um controle ligado que
+      // não faz nada.
+      $('noServidor').checked = false;
+      Paywall.abrirPaywall(null, null);
+      return;
+    }
+    servidorLigado = true;
+    $('noServidorTexto').textContent = 'Ligado';
+  });
+}
+
 // A placa de video pode desistir no meio: quando isso acontece o segmentador
 // cai para o processador sozinho, e a etiqueta do motor precisa contar a
 // verdade em vez de continuar dizendo "placa de video".
@@ -380,6 +416,28 @@ async function processItem(item, file) {
 
 /** Roda a IA sobre o bitmap já decodificado. Reutilizado pelo "Reprocessar". */
 async function runSegmentation(item) {
+  // O servidor, quando a pessoa escolheu, evita baixar o modelo inteiro num
+  // aparelho que vai demorar para rodá-lo. Se ele falhar por qualquer motivo,
+  // cai no navegador em vez de deixar a pessoa sem recorte nenhum.
+  if (servidorLigado) {
+    try {
+      setStatus(item, 'Enviando para o servidor…');
+      const Conta = await import('./conta.js');
+      item.aiMask = await recortarNoServidor(item.bitmap, Conta.tokenAcesso());
+      item.maskCanvas = cloneCanvas(item.aiMask);
+      item.status = 'done';
+      await render(item);
+      item.els.overlay.hidden = true;
+      item.els.card.classList.remove('busy');
+      item.els.card.classList.add('can-compare');
+      ['dlBtn', 'hdBtn', 'cmpBtn', 'editBtn', 'redoBtn'].forEach((k) => { item.els[k].disabled = false; });
+      updateDownloadAll();
+      return;
+    } catch (e) {
+      setStatus(item, 'Servidor indisponível — fazendo aqui mesmo…');
+    }
+  }
+
   setStatus(item, 'Carregando modelo…');
   const { segmenter } = await loadModel();
   item.aiMask = await segmentImage(segmenter, item.bitmap, {

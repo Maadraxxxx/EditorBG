@@ -254,3 +254,103 @@ export async function segmentImage(segmenter, bitmap, { twoPass = true, onStatus
   out.getContext('2d').drawImage(second, sx, sy);
   return out;
 }
+
+/* ------------------------------------------------------------------ *
+ * Recorte no servidor — opcional, só VIP
+ * ------------------------------------------------------------------ */
+
+/**
+ * O lado que o modelo usa. Tem que bater com api/recortar.js: é o contrato
+ * entre os dois, e um número diferente de cada lado devolveria uma máscara
+ * embaralhada em vez de um erro.
+ */
+const LADO_SERVIDOR = 1024;
+
+/**
+ * Manda os PIXELS, não o arquivo.
+ *
+ * O navegador já sabe desenhar a imagem no tamanho que o modelo usa, então ele
+ * manda os bytes RGB prontos. Assim o servidor não precisa de biblioteca de
+ * imagem nenhuma — uma dependência a menos para quebrar num deploy — e o que
+ * trafega são pixels redimensionados, não o arquivo original com os metadados
+ * que uma foto costuma carregar junto (modelo do aparelho, data, às vezes
+ * coordenada de GPS).
+ *
+ * A imagem é esticada para o quadrado e a máscara é esticada de volta. É o que
+ * o próprio modelo faz internamente; fazer aqui só adianta o trabalho.
+ */
+export async function recortarNoServidor(bitmap, token) {
+  const quadrado = document.createElement('canvas');
+  quadrado.width = LADO_SERVIDOR;
+  quadrado.height = LADO_SERVIDOR;
+  const ctx = quadrado.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, LADO_SERVIDOR, LADO_SERVIDOR);
+
+  const dados = ctx.getImageData(0, 0, LADO_SERVIDOR, LADO_SERVIDOR).data;
+  const rgb = new Uint8Array(LADO_SERVIDOR * LADO_SERVIDOR * 3);
+  for (let i = 0, n = LADO_SERVIDOR * LADO_SERVIDOR; i < n; i++) {
+    rgb[i * 3] = dados[i * 4];
+    rgb[i * 3 + 1] = dados[i * 4 + 1];
+    rgb[i * 3 + 2] = dados[i * 4 + 2];
+  }
+
+  const cabecalhos = { 'Content-Type': 'application/json' };
+  if (token) cabecalhos.Authorization = 'Bearer ' + token;
+
+  const r = await fetch('/api/recortar', {
+    method: 'POST',
+    headers: cabecalhos,
+    body: JSON.stringify({ rgb: paraBase64(rgb) }),
+  });
+
+  const resposta = await r.json().catch(() => ({}));
+  if (!r.ok || !resposta.ok) {
+    const erro = new Error(resposta.motivo || 'O servidor não respondeu.');
+    erro.semServidor = true;
+    throw erro;
+  }
+
+  /* A máscara volta em tons de cinza no quadrado; volta ao tamanho da imagem. */
+  const cinza = deBase64(resposta.mascara);
+  const mascaraQuadrada = document.createElement('canvas');
+  mascaraQuadrada.width = LADO_SERVIDOR;
+  mascaraQuadrada.height = LADO_SERVIDOR;
+  const mctx = mascaraQuadrada.getContext('2d');
+  const img = mctx.createImageData(LADO_SERVIDOR, LADO_SERVIDOR);
+  for (let i = 0, n = LADO_SERVIDOR * LADO_SERVIDOR; i < n; i++) {
+    img.data[i * 4] = 255;
+    img.data[i * 4 + 1] = 255;
+    img.data[i * 4 + 2] = 255;
+    img.data[i * 4 + 3] = cinza[i];
+  }
+  mctx.putImageData(img, 0, 0);
+
+  const final = document.createElement('canvas');
+  final.width = bitmap.width;
+  final.height = bitmap.height;
+  const fctx = final.getContext('2d');
+  fctx.imageSmoothingEnabled = true;
+  fctx.imageSmoothingQuality = 'high';
+  fctx.drawImage(mascaraQuadrada, 0, 0, bitmap.width, bitmap.height);
+  return final;
+}
+
+/* btoa em pedaços: passar um array de milhões de bytes de uma vez com o
+   spread estoura a pilha de chamadas do JavaScript. */
+function paraBase64(bytes) {
+  let texto = '';
+  const passo = 8192;
+  for (let i = 0; i < bytes.length; i += passo) {
+    texto += String.fromCharCode.apply(null, bytes.subarray(i, i + passo));
+  }
+  return btoa(texto);
+}
+
+function deBase64(texto) {
+  const binario = atob(texto);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}

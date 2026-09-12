@@ -6,5 +6,8 @@
   "type": "module",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.20.1"
   }
 }
