@@ -2515,20 +2515,6 @@ body[data-mode="pdf"] main { max-width: 1320px; }
 }
 .pdf-diferenca.igual { opacity: .6; }
 
-.pdf-saida {
-  margin: 0;
-  padding: 14px 16px;
-  max-height: 420px;
-  overflow: auto;
-  background: var(--campo);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 
 /* ---------- cor por família de ferramenta ---------- */
 .pdf-icone.cor-estrutura { background: linear-gradient(135deg, #818cf8, #4f46e5); box-shadow: 0 6px 16px rgba(79,70,229,.3); }

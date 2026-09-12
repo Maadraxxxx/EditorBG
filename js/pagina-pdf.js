@@ -52,8 +52,6 @@ const ICONES = {
   word: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8 12 1.6 5 1.9-5 1.9 5L15 12"/>'),
   excel: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="m8.5 12 5 5m0-5-5 5"/>'),
   ppt: svg('<path d="M14 2.5H6.5A1.5 1.5 0 0 0 5 4v16a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 20V7.5Z"/><path d="M14 2.5V7.5h5"/><path d="M8.5 17v-5h2.6a1.7 1.7 0 0 1 0 3.4H8.5"/>'),
-  ia: svg('<path d="M9.5 3.5 11 7.5l4 1.5-4 1.5-1.5 4-1.5-4L4 9l4-1.5Z"/><path d="M17 14l.8 2.2 2.2.8-2.2.8L17 20l-.8-2.2-2.2-.8 2.2-.8Z"/>'),
-  traduzir: svg('<path d="M3.5 6h8M7.5 4v2c0 4-1.7 7-4 9"/><path d="M5 11c1.5 2.5 3.5 4 6.5 5"/><path d="m12.5 20 4-9 4 9"/><path d="M14 17h5"/>'),
   cadeado: svg('<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.5" r="1.4"/>'),
   cadeadoAberto: svg('<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 7.6-1.7"/><circle cx="12" cy="15.5" r="1.4"/>'),
   reparar: svg('<path d="M14.5 6.5a3.5 3.5 0 0 0 4.6 4.6l-8 8a2.3 2.3 0 0 1-3.2-3.2l8-8a3.5 3.5 0 0 0-1.4-1.4Z"/><path d="m5 5 3 3"/>'),
@@ -597,90 +595,6 @@ const FERRAMENTAS = [
     },
   },
   {
-    id: 'resumir',
-    nome: 'Resumir PDF',
-    sobre: 'Escolhe as frases mais representativas do documento e monta um resumo.',
-    icone: 'ia',
-    aceita: 'application/pdf',
-    aviso: 'Funciona em qualquer navegador, na hora, sem baixar nada e sem enviar o '
-      + 'documento para lugar nenhum. O resumo é feito selecionando as frases que já '
-      + 'estão no texto — nada é reescrito, então nada é parafraseado errado. Se o seu '
-      + 'navegador tiver um modelo de linguagem instalado, ele escreve o resumo com '
-      + 'palavras próprias; mas isso é um bônus, não uma exigência.',
-    controles: () => seletor('tamanho', 'Tamanho', [
-      ['curto', 'Curto'], ['medio', 'Médio'], ['longo', 'Longo'],
-    ]) + seletor('formato', 'Formato', [
-      ['pontos', 'Em tópicos'], ['corrido', 'Texto corrido'],
-    ]) + seletor('metodo', 'Método', [
-      ['auto', 'Automático · usa a IA do navegador se houver'],
-      ['extrair', 'Só selecionar frases · sempre igual'],
-    ]) + seletor('saida', 'O que baixar', [['txt', 'Texto (.txt)'], ['pdf', 'PDF']]),
-    async rodar(arquivos, aoProgredir) {
-      const texto = await PDF.paraTexto(arquivos[0]);
-      if (!texto.trim()) throw new Error('Este PDF não tem texto — passe pelo OCR primeiro.');
-
-      const resumo = await PDF.resumir(texto, {
-        tamanho: $('tamanho').value,
-        formato: $('formato').value,
-        metodo: $('metodo').value,
-      }, (f, fase, feito, total) => {
-        aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
-        if (fase === 'baixando') dizer('Preparando o modelo do navegador…');
-        else if (fase === 'resumindo') dizer('Trecho ' + feito + ' de ' + total + '…');
-      });
-
-      const base = PDF.semExtensao(arquivos[0].name);
-      const corte = Math.round((1 - resumo.length / texto.length) * 100);
-      mostrarTexto('Resumo', resumo);
-
-      if ($('saida').value === 'pdf') {
-        return { unico: { nome: base + '-resumo.pdf', blob: await PDF.textoParaPdf(resumo, 'Resumo') },
-          recado: 'Resumo pronto — ' + corte + '% menor que o documento.' };
-      }
-      return { unico: { nome: base + '-resumo.txt', blob: new Blob([resumo], { type: 'text/plain;charset=utf-8' }) },
-        recado: 'Resumo pronto — ' + corte + '% menor que o documento.' };
-    },
-  },
-  {
-    id: 'traduzir',
-    nome: 'Traduzir PDF',
-    sobre: 'Traduz o texto do documento. A tradução roda no seu aparelho.',
-    icone: 'traduzir',
-    aceita: 'application/pdf',
-    aviso: 'Funciona em qualquer navegador, mas de dois jeitos diferentes. Se o seu tiver '
-      + 'tradutor embutido (Chrome novo), traduz para qualquer idioma, na hora, sem baixar '
-      + 'nada. Se não tiver, o site baixa um modelo de cerca de ' + PDF.PESO_DO_TRADUTOR
-      + ' MB na primeira vez, que traduz de vários idiomas PARA O INGLÊS — e só. Um modelo '
-      + 'que traduza para qualquer idioma pesaria mais de 600 MB a cada uso, grande demais '
-      + 'para valer a pena. Nos dois casos o documento não sai do seu aparelho: sai o texto '
-      + 'traduzido, não o PDF original com as palavras trocadas de lugar.',
-    preparar: avisarPesoDoTradutor,
-    controles: () => seletor('de', 'Idioma do documento', PDF.IDIOMAS)
-      + seletor('para', 'Traduzir para', PDF.IDIOMAS.slice().reverse())
-      + seletor('saida', 'O que baixar', [['pdf', 'PDF'], ['txt', 'Texto (.txt)']]),
-    async rodar(arquivos, aoProgredir) {
-      const texto = await PDF.paraTexto(arquivos[0]);
-      if (!texto.trim()) throw new Error('Este PDF não tem texto — passe pelo OCR primeiro.');
-
-      const traduzido = await PDF.traduzir(texto, $('de').value, $('para').value,
-        (f, fase, feito, total) => {
-          aoProgredir(typeof f === 'number' && f <= 1 ? f : 0, feito || 0, total || 0);
-          if (fase === 'baixando') {
-          dizer('Baixando o modelo de tradução — só desta vez, cerca de '
-            + PDF.PESO_DO_TRADUTOR + ' MB. Depois ele fica guardado no navegador.');
-        }
-          else if (fase === 'traduzindo') dizer('Traduzindo o trecho ' + feito + ' de ' + total + '…');
-        });
-
-      const base = PDF.semExtensao(arquivos[0].name) + '-' + $('para').value;
-      mostrarTexto('Tradução', traduzido);
-      if ($('saida').value === 'txt') {
-        return { unico: { nome: base + '.txt', blob: new Blob([traduzido], { type: 'text/plain;charset=utf-8' }) } };
-      }
-      return { unico: { nome: base + '.pdf', blob: await PDF.textoParaPdf(traduzido, null) } };
-    },
-  },
-  {
     id: 'pdfa',
     nome: 'PDF para PDF/A',
     sobre: 'Converte para o formato de arquivamento de longo prazo.',
@@ -880,7 +794,7 @@ const CORES = {
 
   proteger: 'seguranca', desbloquear: 'seguranca', assinar: 'seguranca', ocultar: 'seguranca',
 
-  ocr: 'ia', resumir: 'ia', traduzir: 'ia',
+  ocr: 'ia',
 
   markdown: 'texto', texto: 'texto', html: 'texto',
 
@@ -911,7 +825,6 @@ const ORDEM = [
   'desbloquear', 'proteger',
   'organizar', 'pdfa', 'reparar', 'numeros', 'digitalizar', 'ocr',
   'comparar', 'ocultar', 'recortar', 'formularios',
-  'resumir', 'traduzir',
   'markdown', 'texto',
 ];
 
@@ -1694,13 +1607,6 @@ async function mostrarCampoDeSenha(arquivos) {
 }
 
 
-/** Mostra na tela o texto gerado — resumo e tradução, que valem mais lidos do que baixados. */
-function mostrarTexto(titulo, texto) {
-  $('extra').hidden = false;
-  $('extra').innerHTML = '<span class="aj-titulo"></span><pre class="pdf-saida"></pre>';
-  $('extra').querySelector('.aj-titulo').textContent = titulo;
-  $('extra').querySelector('.pdf-saida').textContent = texto;
-}
 
 /* ------------------------------------------------------------------ *
  * Editar: escrever clicando na página
@@ -2039,23 +1945,6 @@ function desligarCamera() {
 }
 
 
-/**
- * Escreve no próprio botão quanto vai ser baixado, quando for o caso.
- *
- * O aviso em texto some no meio dos outros; o rótulo do botão é a última coisa
- * que a pessoa lê antes de clicar. E some sozinho depois da primeira vez,
- * porque aí não há mais download nenhum para avisar.
- */
-async function avisarPesoDoTradutor() {
-  const botao = $('executar');
-  if (!botao) return;
-  botao.textContent = 'Fazer agora';
-
-  if ('Translator' in self) return;              // o navegador traduz sozinho
-  if (await PDF.tradutorJaBaixado()) return;     // já está guardado aqui
-
-  botao.textContent = 'Baixar o modelo (' + PDF.PESO_DO_TRADUTOR + ' MB) e traduzir';
-}
 
 
 /* ------------------------------------------------------------------ *
