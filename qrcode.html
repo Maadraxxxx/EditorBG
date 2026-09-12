@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gerador de QR Code grátis — link, WiFi, contato e PIX</title>
+  <meta name="description" content="Crie QR Code de link, rede WiFi, contato e PIX com valor. Gerado dentro do seu navegador: a chave PIX e a senha do WiFi não passam por servidor nenhum." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="canonical" href="https://editorbg.com.br/qrcode" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="EditorBG" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:url" content="https://editorbg.com.br/qrcode" />
+  <meta property="og:title" content="Gerador de QR Code grátis — link, WiFi, contato e PIX" />
+  <meta property="og:description" content="Crie QR Code de link, rede WiFi, contato e PIX com valor. Gerado dentro do seu navegador: a chave PIX e a senha do WiFi não passam por servidor nenhum." />
+  <meta property="og:image" content="https://editorbg.com.br/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-mode="qrcode">
+
+<header class="topbar">
+  <a class="brand" href="/" title="Voltar para o início">
+    <div class="logo-marca" aria-hidden="true">
+      <span class="logo-tile logo-recorte">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/></svg>
+      </span>
+      <span class="logo-tile logo-brilho">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 3.5 11.6 8 16 9.6 11.6 11.2 10 15.7 8.4 11.2 4 9.6 8.4 8Z"/>
+          <path d="M17 15.2 17.8 17.4 20 18.2 17.8 19 17 21.2 16.2 19 14 18.2 16.2 17.4Z"/>
+        </svg>
+      </span>
+      <span class="logo-tile logo-tesoura">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/>
+          <path d="M20 4 8.7 16.2"/><path d="M20 20 8.7 7.8"/>
+        </svg>
+      </span>
+      <span class="logo-tile logo-pdf">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.5 3H7a1.4 1.4 0 0 0-1.4 1.4v15.2A1.4 1.4 0 0 0 7 21h10a1.4 1.4 0 0 0 1.4-1.4V8Z"/>
+          <path d="M13.5 3v5h4.9"/>
+        </svg>
+      </span>
+    </div>
+    <div>
+      <h1>EditorBG</h1>
+      <p>Gerador de QR Code — direto no seu navegador</p>
+    </div>
+  </a>
+</header>
+
+<main>
+  <div class="pdf-titulo">
+    <h2>Gerador de QR Code</h2>
+    <p>Feito dentro do seu navegador — sua chave PIX e a senha do WiFi não saem daqui.</p>
+  </div>
+
+  <section class="qr-tela">
+
+    <div class="qr-palco">
+      <div id="palco" hidden>
+        <canvas id="qr"></canvas>
+      </div>
+      <p class="ed-hint" id="faltando"></p>
+
+      <textarea id="codigo" class="qr-codigo" rows="3" readonly hidden></textarea>
+
+      <div class="qr-acoes">
+        <button class="btn primary" id="baixarPng" disabled>Baixar PNG</button>
+        <button class="btn ghost" id="copiar" type="button" hidden>Copiar código PIX</button>
+      </div>
+    </div>
+
+    <aside class="qr-lado">
+      <div class="seg" id="tipos">
+        <button data-tipo="link" class="is-active" type="button">Link</button>
+        <button data-tipo="pix" type="button">PIX</button>
+        <button data-tipo="wifi" type="button">WiFi</button>
+        <button data-tipo="contato" type="button">Contato</button>
+        <button data-tipo="texto" type="button">Texto</button>
+      </div>
+
+      <div class="mq-bloco" data-campos="link">
+        <span class="mq-titulo">Endereço do site</span>
+        <label class="ed-field">
+          <input type="text" id="link" value="editorbg.com.br" placeholder="editorbg.com.br" />
+        </label>
+        <p class="ed-hint small">Sem https na frente, muito leitor abre como texto e não como link. Isso é acrescentado sozinho.</p>
+      </div>
+
+      <div class="mq-bloco" data-campos="texto" hidden>
+        <span class="mq-titulo">Texto</span>
+        <label class="ed-field">
+          <textarea id="texto" rows="4" placeholder="qualquer texto"></textarea>
+        </label>
+      </div>
+
+      <div class="mq-bloco" data-campos="pix" hidden>
+        <span class="mq-titulo">PIX</span>
+        <label class="ed-field">Chave PIX
+          <input type="text" id="pixChave" placeholder="telefone, e-mail, CPF/CNPJ ou chave aleatória" />
+        </label>
+        <label class="ed-field">Nome de quem recebe
+          <input type="text" id="pixNome" maxlength="25" placeholder="como está no banco" />
+        </label>
+        <label class="ed-field">Cidade
+          <input type="text" id="pixCidade" maxlength="15" placeholder="SAO PAULO" />
+        </label>
+        <label class="ed-field">Valor (deixe vazio para quem paga escolher)
+          <input type="text" id="pixValor" inputmode="decimal" placeholder="25,90" />
+        </label>
+        <label class="ed-field">Descrição (opcional)
+          <input type="text" id="pixDescricao" maxlength="40" placeholder="pedido 123" />
+        </label>
+        <p class="ed-hint small">
+          Sem valor, o código serve de placa fixa no balcão e quem paga digita
+          quanto. Com valor, ele já vem travado.
+        </p>
+      </div>
+
+      <div class="mq-bloco" data-campos="wifi" hidden>
+        <span class="mq-titulo">Rede WiFi</span>
+        <label class="ed-field">Nome da rede
+          <input type="text" id="rede" placeholder="como aparece no celular" />
+        </label>
+        <label class="ed-field">Senha
+          <input type="text" id="senhaRede" />
+        </label>
+        <label class="ed-field">Segurança
+          <select id="seguranca">
+            <option value="wpa">WPA / WPA2 / WPA3 — o normal</option>
+            <option value="wep">WEP — redes antigas</option>
+            <option value="aberta">Aberta, sem senha</option>
+          </select>
+        </label>
+        <label class="switch small">
+          <input type="checkbox" id="oculta" />
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-text">A rede é oculta</span>
+        </label>
+      </div>
+
+      <div class="mq-bloco" data-campos="contato" hidden>
+        <span class="mq-titulo">Contato</span>
+        <label class="ed-field">Nome
+          <input type="text" id="ctNome" />
+        </label>
+        <label class="ed-field">Telefone
+          <input type="tel" id="ctTelefone" placeholder="(11) 98888-7777" />
+        </label>
+        <label class="ed-field">E-mail
+          <input type="email" id="ctEmail" />
+        </label>
+        <label class="ed-field">Empresa (opcional)
+          <input type="text" id="ctEmpresa" />
+        </label>
+        <label class="ed-field">Site (opcional)
+          <input type="text" id="ctSite" />
+        </label>
+      </div>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Aparência</span>
+        <label class="ed-field">
+          Tamanho <span class="val" id="tamanhoVal">420 px</span>
+          <input type="range" id="tamanho" min="180" max="1200" step="20" value="420" />
+        </label>
+        <div class="ed-row">
+          <label class="cor-campo">Cor <input type="color" id="corFrente" value="#0b1020" /></label>
+          <label class="cor-campo">Fundo <input type="color" id="corFundo" value="#ffffff" /></label>
+        </div>
+        <p class="qr-alerta" id="contraste" hidden></p>
+        <p class="ed-hint small">
+          O contraste é o que faz a câmera ler. Cor clara sobre fundo claro gera
+          um desenho bonito que celular nenhum reconhece — por isso o contraste
+          é conferido aqui e avisado antes de você imprimir.
+        </p>
+      </div>
+    </aside>
+
+  </section>
+
+  <section class="conteudo">
+    <h2>Sobre o gerador de QR Code</h2>
+
+    <h3>Por que gerar o QR no seu próprio navegador importa</h3>
+    <p>
+      Um gerador de QR online comum recebe o que você digita: a sua chave PIX,
+      a senha do seu WiFi, o seu telefone. São justamente as informações que não
+      deveriam passar pela máquina de terceiros. Aqui o desenho é feito no seu
+      aparelho e nada é enviado — dá para desligar a internet depois que a
+      página abriu e continuar gerando.
+    </p>
+
+    <h3>O código PIX é conferido antes de sair</h3>
+    <p>
+      Todo código PIX termina com quatro caracteres de verificação que o
+      aplicativo do banco confere antes de qualquer outra coisa. Se a conta
+      estiver errada, o banco recusa dizendo apenas que o QR Code é inválido,
+      sem explicar o motivo. O cálculo usado aqui segue a especificação do Banco
+      Central e está conferido contra o vetor de teste padrão.
+    </p>
+
+    <details class="faq">
+      <summary>O QR Code expira?</summary>
+      <p>
+        Não. Ele é uma imagem com um texto dentro — não depende deste site nem
+        de nenhum outro para continuar funcionando. Imprima e use pelo tempo que
+        quiser. É diferente dos geradores que criam um link curto no meio do
+        caminho: naqueles, se o serviço sair do ar, o código para de funcionar.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Posso imprimir bem pequeno?</summary>
+      <p>
+        Dá, dentro de um limite. O código é gerado com correção de erro alta, o
+        que o mantém legível mesmo amassado, sujo ou impresso pequeno. Ainda
+        assim, abaixo de uns 2 cm de lado a câmera de celular comum começa a ter
+        dificuldade.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Dá para pôr o valor no PIX?</summary>
+      <p>
+        Dá, e é opcional de propósito. Sem valor, o código funciona como placa
+        fixa no balcão e quem paga digita quanto. Com valor, ele já chega
+        travado no aplicativo do banco, que é o que se quer numa cobrança
+        específica.
+      </p>
+    </details>
+  </section>
+</main>
+
+<script type="module" src="js/pagina-qrcode.js"></script>
+
+</body>
+</html>

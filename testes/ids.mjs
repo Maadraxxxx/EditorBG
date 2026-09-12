@@ -24,6 +24,8 @@ const PAGINAS = {
   'melhorar.html': ['js/pagina-melhorar.js'],
   'pdf.html': ['js/pagina-pdf.js'],
   'admin.html': ['js/admin.js'],
+  'imagem.html': ['js/pagina-imagem.js'],
+  'qrcode.html': ['js/pagina-qrcode.js'],
 };
 
 /** Partials que entram em toda página por injeção. */

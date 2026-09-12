@@ -2680,3 +2680,164 @@ body[data-mode="busca"] .conteudo {
   margin: 26px auto 0;
   max-width: 880px;
 }
+
+/* ------------------------------------------------------------------ *
+ * Página de converter e comprimir imagem
+ * ------------------------------------------------------------------ */
+body[data-mode="imagem"] main { max-width: 1400px; }
+
+.img-tela {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  margin-top: 22px;
+  align-items: start;
+}
+
+.img-palco {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  /* O xadrez mostra a transparência: sem ele, um PNG recortado sobre fundo
+     branco parece ter fundo branco, e a pessoa só descobre ao baixar. */
+  background-image:
+    linear-gradient(45deg, var(--xadrez-a) 25%, transparent 25%, transparent 75%, var(--xadrez-a) 75%),
+    linear-gradient(45deg, var(--xadrez-a) 25%, var(--xadrez-b) 25%, var(--xadrez-b) 75%, var(--xadrez-a) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+}
+.img-palco img {
+  max-width: 100%;
+  /* Teto de altura pela tela, senão uma foto grande empurra os botões de
+     baixar para fora da dobra. */
+  max-height: calc(100vh - 220px);
+  width: auto;
+  border-radius: 8px;
+}
+.img-medidas {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  background: var(--card);
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.img-peso {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--card);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+.img-peso.bom { color: var(--ok); }
+.img-peso.ruim { color: var(--err); }
+
+.img-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 132px);
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+@media (max-width: 860px) {
+  .img-tela { grid-template-columns: minmax(0, 1fr); }
+  .img-lado { position: static; max-height: none; overflow: visible; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Gerador de QR Code
+ * ------------------------------------------------------------------ */
+.qr-tela {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  margin-top: 22px;
+  align-items: start;
+}
+
+.qr-palco {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 14px;
+  padding: 22px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-height: 320px;
+}
+.qr-palco canvas {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.qr-codigo {
+  width: 100%;
+  max-width: 460px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: vertical;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.qr-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.qr-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 132px);
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+.qr-lado .seg { flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .qr-tela { grid-template-columns: minmax(0, 1fr); }
+  .qr-lado { position: static; max-height: none; overflow: visible; }
+}
+
+.qr-alerta {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.qr-alerta.ruim {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 10%, transparent);
+  border-color: color-mix(in srgb, var(--err) 30%, transparent);
+}
+.qr-alerta.atencao {
+  color: var(--warn, #9a6700);
+  background: color-mix(in srgb, var(--warn, #9a6700) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warn, #9a6700) 28%, transparent);
+}
