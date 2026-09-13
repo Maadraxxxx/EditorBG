@@ -725,15 +725,49 @@ input[type="range"]:focus-visible { outline: 2px solid var(--accent-2); outline-
 .modal {
   position: fixed; inset: 0; z-index: 50;
   background: rgba(20, 26, 39, .45);
-  display: grid; place-items: center;
+  display: grid;
   padding: 24px;
+
+  /*
+   * A CAPA ROLA. Sem isto, um modal mais alto que a tela ficava com a parte de
+   * baixo INALCANCAVEL: `position: fixed` nao rola com a pagina, e o que passa
+   * da tela simplesmente nao existe para quem usa.
+   *
+   * Acontecia de verdade na hora de pagar: com o formulario do Mercado Pago
+   * aberto o cartao passava de 1000px numa tela de 720, e o botao de concluir a
+   * compra ficava 300px abaixo da borda. A pessoa via o formulario e nao tinha
+   * como terminar — o defeito mais caro que este site podia ter.
+   */
+  place-items: start center;
+  overflow-y: auto;
+  /* Rolar dentro do modal nao arrasta a pagina atras dele. */
+  overscroll-behavior: contain;
 }
+
+/*
+ * O centro vem da margem automatica, e nao de `place-items: center`.
+ *
+ * Centralizar pelo alinhamento corta o conteudo pelos DOIS lados quando ele
+ * nao cabe, e a metade de cima fica tao inalcancavel quanto a de baixo. Com
+ * margem automatica o modal fica centralizado enquanto couber e, quando nao
+ * couber, encosta no topo e rola inteiro.
+ */
+.modal > * { margin-block: auto; }
 .modal-inner {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
+/*
+ * So a comparacao tem o X FORA do conteudo, 44px acima. Numa tela baixa, com o
+ * modal encostado no topo para poder rolar, ele cairia em -20px — fora da tela
+ * E fora da area rolavel, porque posicao negativa nao estica a rolagem para
+ * cima. Reservar a altura dele no padrao resolve sem mexer nos outros modais,
+ * cujo X fica dentro do cartao.
+ */
+#modal { padding-top: 68px; }
+
 .modal-close {
   position: absolute; top: -44px; right: 0;
   background: transparent; border: none; color: var(--txt);
@@ -1464,8 +1498,15 @@ input[type="range"]:focus-visible { outline: 2px solid var(--accent-2); outline-
   background: #fff;
   border-radius: 14px;
   padding: 6px;
-  max-height: 46vh;
-  overflow-y: auto;
+  /*
+   * SEM max-height aqui de proposito.
+   *
+   * Antes havia um teto de 46vh com rolagem propria, e o resultado eram DUAS
+   * areas de rolagem uma dentro da outra — sendo que a de fora nem rolava.
+   * Quem tentava pagar rolava a lista de meios de pagamento e continuava sem
+   * achar o botao de concluir, porque ele estava fora da tela, nao fora da
+   * listinha. Agora rola so o modal, inteiro, uma vez.
+   */
 }
 
 .hd-pix { margin-top: 16px; text-align: center; }
