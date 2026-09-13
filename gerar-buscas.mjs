@@ -105,6 +105,9 @@ function pagina(b, outras) {
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
 
+  <!-- Google Ads. A logica fica em js/ads.js: script classico porque as
+       paginas de busca nao carregam modulo nenhum. -->
+  <script src="/js/ads.js"></script>
   <link rel="stylesheet" href="css/style.css" />
 
   <script type="application/ld+json">
@@ -169,7 +172,17 @@ for (const b of BUSCAS) {
 }
 
 /* O sitemap precisa listar as novas, senão elas existem e ninguém as encontra. */
-const fixas = ['/', '/remover-fundo', '/editar', '/melhorar', '/pdf'];
+/*
+ * As paginas que nao sao geradas aqui, mas precisam estar no sitemap.
+ *
+ * Esta lista JA FICOU DESATUALIZADA UMA VEZ: ao entrarem a foto de
+ * documento, o converter e o QR Code, elas foram postas no sitemap a mao,
+ * e a primeira vez que este gerador rodou de novo reescreveu o arquivo
+ * sem elas — as tres sumiram do sitemap sem erro nenhum aparecer. Quem
+ * criar pagina nova fora daqui tem que acrescenta-la nesta linha.
+ */
+const fixas = ['/', '/remover-fundo', '/editar', '/melhorar', '/pdf',
+               '/foto-documento', '/imagem', '/qrcode'];
 const linhas = [
   ...fixas.map((u) => ({ loc: SITE + (u === '/' ? '/' : u), pri: u === '/' ? '1.0' : '0.9' })),
   ...BUSCAS.map((b) => ({ loc: SITE + '/' + b.arquivo, pri: '0.8' })),

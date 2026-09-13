@@ -258,6 +258,25 @@ async function confirmarPagamento(codigo) {
 function liberado() {
   aviso.textContent = 'VIP liberado. Baixando…';
   aviso.className = 'hd-aviso ok';
+
+  /*
+   * Avisa o Google Ads que a visita virou assinante.
+   *
+   * Fica AQUI porque `liberado` é o funil por onde os dois caminhos de
+   * pagamento passam: o cartão, que confirma na hora, e o PIX, que só confirma
+   * quando a espera termina. Pôr o evento em qualquer um dos dois deixaria o
+   * outro fora da conta — e o PIX é justamente o mais usado.
+   *
+   * O valor vem da tabela de planos e nunca do navegador: é o mesmo número que
+   * a função serverless cobra.
+   */
+  try {
+    const p = PLANOS[planoEscolhido];
+    if (p && typeof window.registrarCompra === 'function') {
+      window.registrarCompra(p.valor, p.id);
+    }
+  } catch { /* medir a compra nunca pode impedir a entrega dela */ }
+
   const canvas = canvasPendente;
   const nome = nomePendente;
   setTimeout(() => {

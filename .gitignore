@@ -19,3 +19,6 @@ node_modules/
 # Lixo de sistema
 Thumbs.db
 .DS_Store
+# Imagens de anuncio: sao material de divulgacao, nao fazem parte do site.
+# Publicadas, virariam arquivos soltos em editorbg.com.br/anuncios/.
+anuncios/
