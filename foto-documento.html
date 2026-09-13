@@ -86,8 +86,28 @@
           <button data-formato="5x7" type="button">5 × 7 cm</button>
           <button data-formato="eua" type="button">Visto EUA</button>
           <button data-formato="schengen" type="button">Schengen</button>
+          <button data-formato="livre" type="button" class="livre">
+            Medida livre <span class="selo-vip mini">VIP</span>
+          </button>
         </div>
         <p class="ed-hint small" id="formatoDetalhe">RG, CNH, carteira de trabalho, crachá, concursos</p>
+
+        <div id="camposLivre" hidden>
+          <div class="px-row">
+            <label>Largura <input type="number" id="livreL" min="10" max="200" step="1" value="30" /></label>
+            <label>Altura <input type="number" id="livreA" min="10" max="200" step="1" value="40" /></label>
+            <span class="px-unit">mm</span>
+          </div>
+          <label class="ed-field">
+            Altura da cabeça <span class="val" id="livreCabecaVal">72%</span>
+            <input type="range" id="livreCabeca" min="35" max="90" step="1" value="72" />
+          </label>
+          <p class="ed-hint small">
+            Pegue os dois números na exigência do consulado: o tamanho da foto e
+            quanto a cabeça deve medir do queixo ao alto. Se a exigência der a
+            cabeça em milímetros, divida pela altura da foto.
+          </p>
+        </div>
       </div>
 
       <div class="mq-bloco">
@@ -141,6 +161,17 @@
       </div>
 
       <p class="pdf-aviso" id="aviso" hidden></p>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Folha para imprimir</span>
+        <div class="seg" id="folhas">
+          <button data-folha="10x15" class="is-active" type="button">10 × 15 cm</button>
+          <button data-folha="a4" type="button">A4 <span class="selo-vip mini">VIP</span></button>
+        </div>
+        <p class="ed-hint small" id="folhaDetalhe">
+          A 10 × 15 é a que qualquer farmácia ou laboratório revela por poucos reais.
+        </p>
+      </div>
 
       <button class="btn primary full" id="baixarFoto">Baixar a foto</button>
       <button class="btn primary full" id="baixarFolha">Baixar folha 10 × 15 cm</button>

@@ -12,6 +12,27 @@ import { refreshSliders } from './sliders.js';
 
 const $ = (id) => document.getElementById(id);
 
+// O paywall injeta o próprio markup e baixa o Mercado Pago: entra por import
+// dinâmico para não segurar a página por causa de uma tela que a maioria das
+// visitas nunca abre.
+let Paywall = null;
+const paywallPronto = import('./paywall.js').then((m) => { Paywall = m; return m; });
+const ehVip = () => !!(Paywall && Paywall.temHD());
+
+/**
+ * O VIP daqui só acrescenta.
+ *
+ * Desligado, a página continua exatamente o que era: converter, redimensionar
+ * e comprimir pela qualidade escolhida, sem limite de arquivos e sem marca
+ * nenhuma na saída. O alvo de peso é uma capacidade a mais, e o selo aparece
+ * antes do clique — ninguém descobre que era pago depois de tentar.
+ */
+async function exigirVip(motivo) {
+  if (ehVip()) return true;
+  (await paywallPronto).abrirPaywall(null, null, motivo);
+  return false;
+}
+
 /**
  * Tetos por formato.
  *
@@ -168,15 +189,32 @@ for (const b of $('atalhos').children) {
 /* ------------------------------------------------------------------ *
  * Conversão
  * ------------------------------------------------------------------ */
+/**
+ * Um contador de execucoes, para duas conversoes nao se atropelarem.
+ *
+ * `converter` e assincrona e cada arquivo espera o `toBlob`. Mexer num controle
+ * no meio disso comeca uma segunda conversao enquanto a primeira ainda esta
+ * dentro do laco — e as duas escreviam na MESMA lista de resultados. Com duas
+ * imagens a lista terminava com quatro entradas, o botao oferecia baixar "as 4"
+ * e a contagem de quem nao coube no peso saia dobrada.
+ *
+ * Agora cada execucao carrega o proprio numero e a propria lista: se o numero
+ * mudou, chegou gente mais nova e esta aqui joga fora o que fez em vez de
+ * publicar resultado velho por cima do novo.
+ */
+let execucao = 0;
+
 async function converter() {
   if (!originais.length) return;
+  const meu = ++execucao;
 
   const f = FORMATOS[$('formato').value];
   const qualidade = Number($('qualidade').value) / 100;
   const alvoL = Math.max(1, Number($('larguraAlvo').value) || originais[0].bitmap.width);
   const alvoA = Math.max(1, Number($('alturaAlvo').value) || originais[0].bitmap.height);
 
-  resultados = [];
+  const locais = [];
+  let foraDoAlvo = 0;
   let antesTotal = 0;
   let depoisTotal = 0;
 
@@ -209,10 +247,17 @@ async function converter() {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(o.bitmap, 0, 0, largura, altura);
 
-    const blob = await new Promise((r) => cv.toBlob(r, f.tipo, qualidade));
+    const alvoBytes = pesoAlvoAtivo() ? Number($('pesoAlvo').value) * 1024 : 0;
+    const procura = alvoBytes ? await procurarQualidade(cv, f, alvoBytes) : null;
+    const blob = procura ? procura.blob : await new Promise((r) => cv.toBlob(r, f.tipo, qualidade));
+    if (procura && !procura.coube) foraDoAlvo++;
     if (!blob) { avisar('Este navegador não sabe gravar em ' + f.nome + '.', true); return; }
 
-    resultados.push({
+    // Chegou conversao mais nova enquanto esta esperava: o trabalho daqui ja
+    // nao vale, e insistir sobrescreveria o resultado certo.
+    if (meu !== execucao) return;
+
+    locais.push({
       nome: semExtensao(o.arquivo.name) + '.' + f.extensao,
       blob,
       antes: o.arquivo.size,
@@ -224,12 +269,77 @@ async function converter() {
     depoisTotal += blob.size;
   }
 
-  mostrar(antesTotal, depoisTotal);
+  if (meu !== execucao) return;
+  resultados = locais;
+  mostrar(antesTotal, depoisTotal, foraDoAlvo);
 }
+
+/* ------------------------------------------------------------------ *
+ * Alvo de peso — VIP
+ * ------------------------------------------------------------------ */
+const pesoAlvoAtivo = () => $('pesoAlvoLigar').checked && ehVip();
+
+/**
+ * Procura a melhor qualidade que ainda cabe no peso pedido.
+ *
+ * Não dá para calcular: quanto um JPG pesa em cada qualidade depende do que
+ * está na foto — céu liso comprime muito, folhagem quase nada. Então o jeito é
+ * tentar. Busca binária em 8 passos cobre a faixa de 30% a 100% com precisão
+ * melhor que meio ponto, e cada passo é uma codificação, que numa foto comum
+ * leva poucos milissegundos.
+ *
+ * A regra é "a MELHOR que ainda cabe", nunca "a primeira que coube": guardar o
+ * melhor resultado visto e continuar subindo entrega a imagem mais bonita que
+ * respeita o limite, em vez de uma qualquer bem abaixo dele.
+ */
+async function procurarQualidade(cv, f, alvoBytes) {
+  // PNG não perde nada e por isso não tem qualidade para negociar: o que ele
+  // pesa é o que ele pesa. Resta dizer se coube ou não.
+  if (f.tipo === 'image/png') {
+    const unico = await new Promise((r) => cv.toBlob(r, f.tipo));
+    return { blob: unico, coube: !!unico && unico.size <= alvoBytes };
+  }
+
+  let baixo = 0.15;
+  let alto = 1.0;
+  let melhor = null;
+
+  for (let i = 0; i < 8; i++) {
+    const meio = (baixo + alto) / 2;
+    const tentativa = await new Promise((r) => cv.toBlob(r, f.tipo, meio));
+    if (!tentativa) return null;
+    if (tentativa.size <= alvoBytes) { melhor = tentativa; baixo = meio; }
+    else { alto = meio; }
+  }
+
+  if (melhor) return { blob: melhor, coube: true };
+
+  // Nem no mínimo coube. Devolver a menor possível e DIZER isso é melhor que
+  // entregar em silêncio um arquivo acima do limite que o formulário vai
+  // recusar — a pessoa precisa saber que tem de diminuir os pixels.
+  return { blob: await new Promise((r) => cv.toBlob(r, f.tipo, baixo)), coube: false };
+}
+
+$('pesoAlvoLigar').addEventListener('change', async () => {
+  if (!$('pesoAlvoLigar').checked) { $('pesoAlvoControles').hidden = true; converter(); return; }
+  const liberado = await exigirVip({
+    titulo: 'Caber num peso exato',
+    texto: 'Diga o limite em KB e a melhor qualidade que ainda cabe é procurada '
+      + 'sozinha — feito para formulário que recusa arquivo grande.',
+  });
+  if (!liberado) { $('pesoAlvoLigar').checked = false; return; }
+  $('pesoAlvoControles').hidden = false;
+  converter();
+});
+
+$('pesoAlvo').addEventListener('input', () => {
+  clearTimeout(pendente);
+  pendente = setTimeout(converter, 300);
+});
 
 let previaUrl = null;
 
-function mostrar(antes, depois) {
+function mostrar(antes, depois, foraDoAlvo = 0) {
   const r = resultados[0];
   if (previaUrl) URL.revokeObjectURL(previaUrl);
   previaUrl = URL.createObjectURL(r.blob);
@@ -247,6 +357,21 @@ function mostrar(antes, depois) {
     ? 'Baixar imagem'
     : 'Baixar as ' + resultados.length + ' num .zip';
   $('fundoGrupo').hidden = FORMATOS[$('formato').value].transparencia;
+
+  // Com alvo de peso, a qualidade deixa de ser escolha: ela passa a ser
+  // consequência do limite. Deixar o controle ligado ali daria a impressão de
+  // que ele ainda manda em alguma coisa.
+  $('grupoQualidade').hidden = pesoAlvoAtivo() || $('formato').value === 'png';
+
+  if (pesoAlvoAtivo() && foraDoAlvo) {
+    const quais = resultados.length === 1
+      ? 'Não cheguei'
+      : foraDoAlvo + ' de ' + resultados.length + ' imagens não chegaram';
+    avisar(quais + ' a ' + $('pesoAlvo').value + ' KB nem na qualidade mais baixa. '
+      + 'Diminua a largura em pixels, ou tente WEBP, que costuma sair bem menor.', true);
+  } else if (pesoAlvoAtivo()) {
+    avisar('');
+  }
 }
 
 /* ------------------------------------------------------------------ *

@@ -12,6 +12,26 @@ import { refreshSliders } from './sliders.js';
 
 const $ = (id) => document.getElementById(id);
 
+// O paywall entra por import dinâmico porque ele injeta o próprio markup e
+// baixa o Mercado Pago: não vale segurar a página por causa de uma tela que a
+// maioria das visitas nunca abre.
+let Paywall = null;
+const paywallPronto = import('./paywall.js').then((m) => { Paywall = m; return m; });
+const ehVip = () => !!(Paywall && Paywall.temHD());
+
+/**
+ * Toda entrada VIP é um convite, nunca uma porta trancada sem aviso.
+ *
+ * O selo fica visível no botão desde antes do clique — descobrir que era pago
+ * só depois de clicar é a versão irritante disto. E nada que já era grátis
+ * passa por aqui: estes controles só acrescentam.
+ */
+async function exigirVip(motivo) {
+  if (ehVip()) return true;
+  (await paywallPronto).abrirPaywall(null, null, motivo);
+  return false;
+}
+
 let lib = null;
 const carregarLib = () => (lib
   ? Promise.resolve(lib)
@@ -182,6 +202,7 @@ async function desenhar() {
   }
 
   conferirContraste();
+  if (logo) desenharLogo($('qr').getContext('2d'), lado);
 
   // O código copia e cola do PIX vale tanto quanto o desenho: muita gente
   // prefere colar no aplicativo do banco a apontar a câmera para a própria tela.
@@ -189,6 +210,80 @@ async function desenhar() {
   $('codigo').hidden = tipo !== 'pix';
   if (tipo === 'pix') $('codigo').value = conteudo;
 }
+
+/* ------------------------------------------------------------------ *
+ * Logo no meio — VIP
+ * ------------------------------------------------------------------ */
+let logo = null;
+
+/**
+ * Desenha a logo no centro, sobre uma almofada da cor do fundo.
+ *
+ * A almofada não é enfeite: sem ela a logo fica encostada nos quadradinhos e o
+ * leitor perde a divisa entre um e outro. E o tamanho tem teto de 30% do lado
+ * justamente porque o que permite cobrir o meio é a correção de erro alta, que
+ * aguenta perder cerca de 30% do código — passar disso deixa de ser margem de
+ * segurança e vira código quebrado.
+ */
+function desenharLogo(ctx, lado) {
+  const fracao = Number($('logoTamanho').value) / 100;
+  const caixa = Math.round(lado * fracao);
+  const x = Math.round((lado - caixa) / 2);
+  const raio = Math.round(caixa * 0.18);
+  const folga = Math.max(4, Math.round(caixa * 0.1));
+
+  ctx.save();
+  ctx.fillStyle = $('corFundo').value;
+  ctx.beginPath();
+  ctx.roundRect(x - folga, x - folga, caixa + folga * 2, caixa + folga * 2, raio);
+  ctx.fill();
+
+  // A logo entra inteira dentro do quadrado, sem esticar: uma marca deformada
+  // é pior que uma marca pequena.
+  const k = Math.min(caixa / logo.width, caixa / logo.height);
+  const l = Math.round(logo.width * k);
+  const a = Math.round(logo.height * k);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(logo, x + (caixa - l) / 2, x + (caixa - a) / 2, l, a);
+  ctx.restore();
+}
+
+$('logoBotao').addEventListener('click', async () => {
+  if (!(await exigirVip({
+    titulo: 'Logo no meio do QR Code',
+    texto: 'Ponha a marca da sua loja no centro do código. O QR continua sendo lido — '
+      + 'a correção de erro alta cobre a parte tapada.',
+  }))) return;
+  $('logoArquivo').click();
+});
+
+$('logoArquivo').addEventListener('change', async () => {
+  const arquivo = $('logoArquivo').files[0];
+  $('logoArquivo').value = '';
+  if (!arquivo) return;
+  try {
+    logo = await createImageBitmap(arquivo);
+  } catch {
+    $('faltando').hidden = false;
+    $('faltando').textContent = 'Não consegui abrir essa imagem de logo.';
+    return;
+  }
+  $('logoControles').hidden = false;
+  $('logoBotao').textContent = 'Trocar a logo';
+  desenhar();
+});
+
+$('logoTamanho').addEventListener('input', () => {
+  $('logoTamanhoVal').textContent = $('logoTamanho').value + '%';
+  desenhar();
+});
+
+$('tirarLogo').addEventListener('click', () => {
+  logo = null;
+  $('logoControles').hidden = true;
+  $('logoBotao').innerHTML = 'Pôr uma logo no meio <span class="selo-vip mini">VIP</span>';
+  desenhar();
+});
 
 /* ------------------------------------------------------------------ *
  * Saída
@@ -203,6 +298,72 @@ $('baixarPng').addEventListener('click', () => {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }, 'image/png');
 });
+
+/**
+ * O mesmo código em vetor — VIP.
+ *
+ * Um PNG de 1200 px vira um borrão numa fachada de dois metros. O SVG é
+ * desenho, não pixel: a gráfica imprime do tamanho que quiser sem perder nada.
+ * A logo, quando existe, entra embutida no próprio arquivo, senão o SVG
+ * apontaria para uma imagem que só existe no computador de quem gerou.
+ */
+$('baixarSvg').addEventListener('click', async () => {
+  if (!(await exigirVip({
+    titulo: 'Baixar o QR Code em SVG',
+    texto: 'O SVG é desenho, não pixel: imprime do tamanho que quiser, de adesivo '
+      + 'a fachada, sem virar borrão.',
+  }))) return;
+  if (!conteudoAtual) return;
+
+  const QR = await carregarLib();
+  let svg = await QR.toString(conteudoAtual, {
+    type: 'svg',
+    margin: 2,
+    errorCorrectionLevel: 'H',
+    color: { dark: $('corFrente').value, light: $('corFundo').value },
+  });
+
+  if (logo) svg = comLogoNoSvg(svg);
+  baixar(new Blob([svg], { type: 'image/svg+xml' }), 'qrcode-' + tipo + '.svg');
+});
+
+/** Embute a logo no SVG, nas mesmas proporções do desenho da tela. */
+function comLogoNoSvg(svg) {
+  // O viewBox diz em que escala o SVG trabalha: os módulos do QR, não pixels.
+  const vb = (svg.match(/viewBox="0 0 (\d+(?:\.\d+)?) /) || [])[1];
+  const lado = Number(vb) || 25;
+
+  const cv = document.createElement('canvas');
+  const fracao = Number($('logoTamanho').value) / 100;
+  const caixa = lado * fracao;
+  const x = (lado - caixa) / 2;
+  const folga = caixa * 0.1;
+
+  const k = Math.min(caixa / logo.width, caixa / logo.height);
+  const l = logo.width * k;
+  const a = logo.height * k;
+
+  cv.width = logo.width;
+  cv.height = logo.height;
+  cv.getContext('2d').drawImage(logo, 0, 0);
+
+  const pedaco = '<rect x="' + (x - folga) + '" y="' + (x - folga) + '"'
+    + ' width="' + (caixa + folga * 2) + '" height="' + (caixa + folga * 2) + '"'
+    + ' rx="' + (caixa * 0.18) + '" fill="' + $('corFundo').value + '"/>'
+    + '<image x="' + (x + (caixa - l) / 2) + '" y="' + (x + (caixa - a) / 2) + '"'
+    + ' width="' + l + '" height="' + a + '" href="' + cv.toDataURL('image/png') + '"/>';
+
+  return svg.replace('</svg>', pedaco + '</svg>');
+}
+
+function baixar(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
 $('copiar').addEventListener('click', async () => {
   try {

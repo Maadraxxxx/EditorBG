@@ -17,6 +17,26 @@ import { refreshSliders } from './sliders.js';
 
 const $ = (id) => document.getElementById(id);
 
+// O paywall injeta o próprio markup e baixa o Mercado Pago: entra por import
+// dinâmico para não segurar a página por uma tela que a maioria nunca abre.
+let Paywall = null;
+const paywallPronto = import('./paywall.js').then((m) => { Paywall = m; return m; });
+const ehVip = () => !!(Paywall && Paywall.temHD());
+
+/**
+ * O VIP daqui só acrescenta.
+ *
+ * Desligado, a página continua inteira: os quatro formatos, o fundo branco
+ * automático, o enquadramento sugerido, as guias, a foto avulsa a 300 DPI e a
+ * folha 10 × 15 com nove fotos. A medida livre e a folha A4 são capacidades a
+ * mais, e o selo aparece antes do clique.
+ */
+async function exigirVip(motivo) {
+  if (ehVip()) return true;
+  (await paywallPronto).abrirPaywall(null, null, motivo);
+  return false;
+}
+
 /** Tudo é medido em milímetro e só vira pixel no fim. */
 const DPI = 300;
 const mmPx = (mm) => Math.round((mm / 25.4) * DPI);
@@ -57,10 +77,30 @@ const FORMATOS = {
     detalhe: '3,5 × 4,5 cm · cabeça entre 32 e 36 mm',
     mmL: 35, mmA: 45, cabeca: 0.755,
   },
+  // Os números deste saem dos campos da tela. Existe porque exigência de
+  // documento muda por país e por ano: em vez de eu adivinhar a medida de
+  // cada consulado — e errar, que numa foto de visto significa recusa —, quem
+  // lê a exigência digita o que ela diz.
+  livre: {
+    nome: 'Medida livre',
+    detalhe: 'o tamanho que a exigência pedir',
+    mmL: 30, mmA: 40, cabeca: 0.72,
+  },
 };
 
-/** A folha que qualquer laboratório revela barato. */
-const FOLHA = { mmL: 100, mmA: 150, nome: '10 × 15 cm' };
+/** As folhas de impressão. A 10 × 15 é grátis; a A4 é VIP. */
+const FOLHAS = {
+  '10x15': {
+    nome: '10 × 15 cm', mmL: 100, mmA: 150, vip: false,
+    detalhe: 'A que qualquer farmácia ou laboratório revela por poucos reais.',
+  },
+  a4: {
+    nome: 'A4', mmL: 210, mmA: 297, vip: true,
+    detalhe: 'Cabe muito mais foto na mesma folha — para quem imprime em casa '
+      + 'ou manda imprimir em papel comum.',
+  },
+};
+
 
 /** Quanto de céu fica acima da cabeça, em fração da altura da foto. */
 const MARGEM_TOPO = 0.09;
@@ -69,6 +109,7 @@ let original = null;      // ImageBitmap da foto como veio
 let recortado = null;     // canvas da pessoa sem fundo (ou null)
 let silhueta = null;      // { topo, pescoco, centroX } em pixel da foto
 let formato = '3x4';
+let folha = '10x15';
 let fundo = '#ffffff';
 let semFundo = true;
 let guias = true;
@@ -322,8 +363,28 @@ function enquadrarAutomatico() {
     const escala = Math.max(alvoL / original.width, alvoA / original.height);
     quadro = { escala, cx: original.width / 2, cy: original.height / 2 };
   }
+  const pedida = quadro.escala;
   limitarQuadro();
   $('zoom').value = String(Math.round(quadro.escala * 100));
+
+  /*
+   * A foto pode não ter margem para o enquadramento pedido.
+   *
+   * Para deixar a cabeça pequena dentro do quadro é preciso afastar, e afastar
+   * exige imagem em volta que talvez não exista — um retrato já cortado no
+   * ombro não tem de onde tirar. O limite corrige a escala sozinho, e sem
+   * aviso o resultado sairia com a cabeça maior que a pedida sem ninguém
+   * perceber. Numa foto de visto é exatamente isso que faz ser recusada, então
+   * a diferença precisa ser dita.
+   */
+  if (silhueta && quadro.escala > pedida * 1.02) {
+    const virou = ((silhueta.pescoco - silhueta.topo) * quadro.escala) / mmPx(f.mmA);
+    avisar('Esta foto não tem margem para deixar a cabeça em '
+      + Math.round(f.cabeca * 100) + '%: ficou em ' + Math.round(virou * 100)
+      + '%. Use uma foto com mais espaço em volta da pessoa.', true);
+  } else if ($('aviso').textContent.startsWith('Esta foto não tem margem')) {
+    avisar('');
+  }
 }
 
 /** O recorte não pode sair da foto: fora dela só há vazio. */
@@ -507,14 +568,50 @@ $('reenquadrar').addEventListener('click', () => { enquadrarAutomatico(); desenh
 /* ------------------------------------------------------------------ *
  * Controles
  * ------------------------------------------------------------------ */
-$('formatos').addEventListener('click', (e) => {
+$('formatos').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-formato]');
   if (!b) return;
+
+  if (b.dataset.formato === 'livre' && !(await exigirVip({
+    titulo: 'Medida livre em milímetros',
+    texto: 'Digite o tamanho e a altura da cabeça que a exigência pedir — serve '
+      + 'para qualquer documento de qualquer país, inclusive os que mudam de regra.',
+  }))) return;
+
   formato = b.dataset.formato;
   for (const o of $('formatos').children) o.classList.toggle('is-active', o === b);
   $('formatoDetalhe').textContent = FORMATOS[formato].detalhe;
+  $('camposLivre').hidden = formato !== 'livre';
   enquadrarAutomatico();
   desenhar();
+});
+
+/* Os campos da medida livre alimentam a própria entrada da tabela. */
+for (const id of ['livreL', 'livreA', 'livreCabeca']) {
+  $(id).addEventListener('input', () => {
+    $('livreCabecaVal').textContent = $('livreCabeca').value + '%';
+    FORMATOS.livre.mmL = Math.min(200, Math.max(10, Number($('livreL').value) || 30));
+    FORMATOS.livre.mmA = Math.min(200, Math.max(10, Number($('livreA').value) || 40));
+    FORMATOS.livre.cabeca = Number($('livreCabeca').value) / 100;
+    FORMATOS.livre.nome = FORMATOS.livre.mmL + ' × ' + FORMATOS.livre.mmA + ' mm';
+    if (formato === 'livre') { enquadrarAutomatico(); desenhar(); }
+  });
+}
+
+$('folhas').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-folha]');
+  if (!b) return;
+
+  if (FOLHAS[b.dataset.folha].vip && !(await exigirVip({
+    titulo: 'Folha A4 cheia de fotos',
+    texto: 'Na A4 cabem 49 fotos 3×4 em vez de 9, com as linhas de corte no lugar '
+      + '— é a folha de quem imprime em casa ou manda imprimir em papel comum.',
+  }))) return;
+
+  folha = b.dataset.folha;
+  for (const o of $('folhas').children) o.classList.toggle('is-active', o === b);
+  $('folhaDetalhe').textContent = FOLHAS[folha].detalhe;
+  atualizarFolha();
 });
 
 $('fundos').addEventListener('click', (e) => {
@@ -554,14 +651,15 @@ function gradeDaFolha() {
   const f = FORMATOS[formato];
   // Sem espaço entre as fotos: o corte cai na divisa, que é como o laboratório
   // faz. Deixar folga só reduziria quantas cabem.
-  const colunas = Math.floor(FOLHA.mmL / f.mmL);
-  const linhas = Math.floor(FOLHA.mmA / f.mmA);
+  const lf = FOLHAS[folha];
+  const colunas = Math.floor(lf.mmL / f.mmL);
+  const linhas = Math.floor(lf.mmA / f.mmA);
   return { colunas, linhas, total: colunas * linhas };
 }
 
 function atualizarFolha() {
   const g = gradeDaFolha();
-  $('baixarFolha').textContent = 'Baixar folha ' + FOLHA.nome + ' com ' + g.total
+  $('baixarFolha').textContent = 'Baixar folha ' + FOLHAS[folha].nome + ' com ' + g.total
     + (g.total === 1 ? ' foto' : ' fotos');
   $('baixarFolha').disabled = g.total < 1;
 }
@@ -569,8 +667,8 @@ function atualizarFolha() {
 function montarFolha() {
   const f = FORMATOS[formato];
   const g = gradeDaFolha();
-  const folhaL = mmPx(FOLHA.mmL);
-  const folhaA = mmPx(FOLHA.mmA);
+  const folhaL = mmPx(FOLHAS[folha].mmL);
+  const folhaA = mmPx(FOLHAS[folha].mmA);
   const fotoL = mmPx(f.mmL);
   const fotoA = mmPx(f.mmA);
 

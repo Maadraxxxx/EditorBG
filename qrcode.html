@@ -169,6 +169,34 @@
         </label>
       </div>
 
+      <div class="mq-bloco" id="blocoVip">
+        <span class="mq-titulo">Extras <span class="selo-vip">VIP</span></span>
+
+        <button class="btn ghost full" id="logoBotao" type="button">
+          Pôr uma logo no meio <span class="selo-vip mini">VIP</span>
+        </button>
+        <input type="file" id="logoArquivo" accept="image/*" hidden />
+
+        <div id="logoControles" hidden>
+          <label class="ed-field">
+            Tamanho da logo <span class="val" id="logoTamanhoVal">22%</span>
+            <input type="range" id="logoTamanho" min="12" max="30" step="1" value="22" />
+          </label>
+          <button class="btn ghost full" id="tirarLogo" type="button">Tirar a logo</button>
+        </div>
+
+        <button class="btn ghost full" id="baixarSvg" type="button">
+          Baixar em SVG <span class="selo-vip mini">VIP</span>
+        </button>
+
+        <p class="ed-hint small">
+          A logo cabe porque o código é gerado com correção de erro alta: ele
+          continua sendo lido mesmo com um pedaço coberto. O SVG não perde
+          qualidade em tamanho nenhum — é o que a gráfica pede para banner e
+          fachada.
+        </p>
+      </div>
+
       <div class="mq-bloco">
         <span class="mq-titulo">Aparência</span>
         <label class="ed-field">

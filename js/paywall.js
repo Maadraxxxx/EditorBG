@@ -133,7 +133,16 @@ export function baixar(canvas, nome, { hd = false } = {}) {
 /* ------------------------------------------------------------------ *
  * Tela de compra
  * ------------------------------------------------------------------ */
-export function abrirPaywall(canvas, nome) {
+/**
+ * Abre a tela do VIP.
+ *
+ * O terceiro argumento diz POR QUE ela abriu. Sem ele, quem clicava em "pôr
+ * uma logo no QR Code" recebia um modal intitulado "Baixar em alta resolução"
+ * e tinha que adivinhar a ligação — o texto falava de um recurso que não era o
+ * que a pessoa pediu. Quando o motivo vem, o título passa a ser o do recurso
+ * clicado; sem ele, o texto padrão da resolução continua valendo.
+ */
+export function abrirPaywall(canvas, nome, motivo = null) {
   canvasPendente = canvas;
   nomePendente = nome;
 
@@ -145,7 +154,12 @@ export function abrirPaywall(canvas, nome) {
     $('hdTamGratis').textContent = menor.width + ' × ' + menor.height;
     $('hdTamHD').textContent = canvas.width + ' × ' + canvas.height;
   }
-  $('hdLimite').textContent = Math.round(REDUCAO_GRATIS * 100) + '%';
+
+  $('hdTitulo').textContent = motivo ? motivo.titulo : 'Baixar em alta resolução';
+  $('hdSub').innerHTML = motivo
+    ? motivo.texto
+    : 'O download grátis sai com <strong id="hdLimite">30%</strong> menos resolução.';
+  if (!motivo) $('hdLimite').textContent = Math.round(REDUCAO_GRATIS * 100) + '%';
   desenharPlanos();
   mostrarRenovacao();
   aviso.textContent = '';

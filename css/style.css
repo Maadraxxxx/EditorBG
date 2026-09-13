@@ -2920,3 +2920,16 @@ body[data-mode="imagem"] main { max-width: 1400px; }
 .home-icon-foto { background: linear-gradient(135deg, #10b981, #047857); box-shadow: 0 8px 22px rgba(16, 185, 129, .32); }
 .home-icon-conv { background: linear-gradient(135deg, #f97316, #ea580c); box-shadow: 0 8px 22px rgba(249, 115, 22, .32); }
 .home-icon-qr   { background: linear-gradient(135deg, #8b5cf6, #6d28d9); box-shadow: 0 8px 22px rgba(139, 92, 246, .32); }
+
+/* O botao de medida livre ocupa a fileira inteira: sozinho numa grade de duas
+   colunas ele ficaria encostado na esquerda, com um buraco do lado. */
+.seg.coluna .livre { grid-column: 1 / -1; }
+
+/* Blocos de extras VIP: botoes empilhados com respiro entre eles. */
+#blocoVip .btn, #blocoVipImg .btn { margin-top: 2px; }
+#logoControles, #pesoAlvoControles, #camposLivre {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
