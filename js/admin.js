@@ -264,7 +264,7 @@ function barrar(titulo, texto) {
 
 async function abrir() {
   try {
-    await Promise.all([carregarResumo(), carregarLista()]);
+    await Promise.all([carregarResumo(), carregarLista(), carregarSaques()]);
     $('admCarregando').hidden = true;
     $('admBarrado').hidden = true;
     $('admConteudo').hidden = false;
@@ -287,7 +287,7 @@ async function abrir() {
 }
 
 $('admAtualizar').addEventListener('click', () => {
-  Promise.all([carregarResumo(), carregarLista()])
+  Promise.all([carregarResumo(), carregarLista(), carregarSaques()])
     .then(() => avisar('Atualizado.', 'ok'))
     .catch((err) => avisar(err.message, 'erro'));
 });
@@ -307,4 +307,91 @@ Conta.aoMudar(({ usuario }) => {
   const agora = usuario ? usuario.id : null;
   if (anterior !== null && anterior !== agora) abrir();
   anterior = agora;
+});
+
+/* ------------------------------------------------------------------ *
+ * Saques de indicação
+ * ------------------------------------------------------------------ */
+const dinheiroBR = (v) => 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
+const diaBR = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
+
+const SITUACAO_SAQUE = {
+  pedido: { texto: 'Esperando', classe: 'aguardando' },
+  pago: { texto: 'Pago', classe: 'bom' },
+  recusado: { texto: 'Recusado', classe: 'ruim' },
+};
+
+async function carregarSaques() {
+  const corpo = document.getElementById('admSaques');
+  try {
+    const { saques, minimo } = await pedir('saques', {});
+    if (minimo != null) document.getElementById('admMinimo').value = minimo;
+
+    corpo.innerHTML = saques.length
+      ? saques.map((s) => {
+        const st = SITUACAO_SAQUE[s.status] || { texto: s.status, classe: '' };
+        // A chave PIX aparece inteira de propósito: é ela que você vai colar no
+        // aplicativo do banco para pagar, e meia chave não paga ninguém.
+        const acoes = s.status === 'pedido'
+          ? `<button class="btn ghost pequeno" data-pagar="${s.id}">Marcar pago</button>
+             <button class="btn ghost pequeno" data-recusar="${s.id}">Recusar</button>`
+          : (s.motivo || diaBR(s.resolvido_em));
+        return `
+          <tr>
+            <td>${diaBR(s.criado_em)}</td>
+            <td>${s.email || s.afiliado_id}</td>
+            <td class="num forte">${dinheiroBR(s.valor)}</td>
+            <td><code class="adm-pix">${s.chave_pix}</code></td>
+            <td><span class="sit ${st.classe}">${st.texto}</span></td>
+            <td>${acoes}</td>
+          </tr>`;
+      }).join('')
+      : '<tr><td colspan="6" class="vazio">Nenhum saque pedido ainda.</td></tr>';
+  } catch (err) {
+    corpo.innerHTML = '<tr><td colspan="6" class="vazio">Não deu para ler os saques.</td></tr>';
+    console.error(err);
+  }
+}
+
+document.getElementById('admSaques').addEventListener('click', async (e) => {
+  const pagar = e.target.closest('[data-pagar]');
+  const recusar = e.target.closest('[data-recusar]');
+  if (!pagar && !recusar) return;
+
+  const aviso = document.getElementById('admSaqueAviso');
+  try {
+    if (pagar) {
+      // Confirmação porque o dinheiro já saiu do banco quando você clica aqui:
+      // marcar pago sem ter pago deixa a pessoa sem o saldo e sem o PIX.
+      if (!confirm('Marcar como PAGO? Faça o PIX antes — isto só registra.')) return;
+      await pedir('resolver-saque', { id: pagar.dataset.pagar, status: 'pago' });
+      aviso.textContent = 'Saque marcado como pago.';
+    } else {
+      const motivo = prompt('Por que está recusando? A pessoa vai ler isto, e o '
+        + 'valor volta para o saldo dela.');
+      if (!motivo || !motivo.trim()) return;
+      await pedir('resolver-saque', { id: recusar.dataset.recusar, status: 'recusado', motivo });
+      aviso.textContent = 'Saque recusado. O valor voltou para o saldo.';
+    }
+    aviso.className = 'hd-aviso ok';
+    await carregarSaques();
+  } catch (err) {
+    aviso.textContent = err.message || 'Não deu certo.';
+    aviso.className = 'hd-aviso erro';
+  }
+});
+
+document.getElementById('admSalvarMinimo').addEventListener('click', async () => {
+  const aviso = document.getElementById('admSaqueAviso');
+  try {
+    const { minimo } = await pedir('saque-minimo', {
+      valor: Number(document.getElementById('admMinimo').value),
+    });
+    document.getElementById('admMinimo').value = minimo;
+    aviso.textContent = 'Mínimo para sacar agora é ' + dinheiroBR(minimo) + '.';
+    aviso.className = 'hd-aviso ok';
+  } catch (err) {
+    aviso.textContent = err.message || 'Não deu para gravar.';
+    aviso.className = 'hd-aviso erro';
+  }
 });

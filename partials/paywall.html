@@ -39,6 +39,20 @@
          no HTML criaria um terceiro lugar para eles ficarem desatualizados. -->
     <div class="hd-planos" id="hdPlanos" role="radiogroup" aria-label="Escolha o plano"></div>
 
+    <p class="hd-indicacao-ok" id="hdIndicacaoOk" hidden></p>
+
+    <details class="hd-manual hd-indicacao">
+      <summary>Tem um código de indicação?</summary>
+      <p class="hd-manual-texto">
+        Quem te indicou ganha uma parte, e você paga 20% menos. Se você chegou
+        por um link de indicação, o código já está aplicado.
+      </p>
+      <label class="ed-field">Código
+        <input type="text" id="hdIndicacao" placeholder="ex.: K7QM2XZ" autocomplete="off" />
+      </label>
+      <button class="btn ghost full" id="hdAplicarIndicacao" type="button">Aplicar desconto</button>
+    </details>
+
     <p class="hd-renova" id="hdRenova" hidden></p>
 
     <button class="btn primary full" id="hdEntrar" hidden>Entrar para assinar</button>

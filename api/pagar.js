@@ -25,7 +25,8 @@
 // A mesma tabela que o navegador usa para desenhar os cartões. Importar em vez
 // de repetir evita o pior dos bugs de preço: a tela dizer um valor e a cobrança
 // ser outra.
-import { plano as buscarPlano, PLANO_PADRAO } from '../js/planos.js';
+import { plano as buscarPlano, PLANO_PADRAO, comDesconto } from '../js/planos.js';
+import { afiliadoPorCodigo, podeSerIndicado } from './_afiliados.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -66,17 +67,53 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, motivo: 'Plano desconhecido.' });
   }
 
+  /* ---- desconto de indicacao ---- */
+  /*
+   * O navegador manda o CODIGO, nunca o preco.
+   *
+   * Quem decide se o desconto vale e este servidor: o codigo existe? e de
+   * outra pessoa? esta pessoa ja foi indicada ou ja e cliente? Se a conta do
+   * desconto viesse de fora, bastaria mandar um valor menor no corpo da
+   * requisicao para virar VIP por qualquer preco — que e o mesmo motivo pelo
+   * qual o valor do plano ja vinha daqui.
+   */
+  const env = {
+    url: supabaseUrl.replace(/\/$/, ''),
+    chave: serviceKey,
+  };
+
+  let indicadoPor = null;
+  let valorCobrado = escolhido.valor;
+
+  const codigoPedido = (req.body && req.body.indicacao) || '';
+  if (codigoPedido) {
+    try {
+      const dono = await afiliadoPorCodigo(codigoPedido, env);
+      const pode = dono ? await podeSerIndicado(usuario.id, dono.id, env) : { pode: false };
+      if (dono && pode.pode) {
+        indicadoPor = dono.id;
+        valorCobrado = comDesconto(escolhido.valor);
+      }
+    } catch (err) {
+      // Um codigo que nao deu para conferir nao pode impedir a venda: a pessoa
+      // paga o preco cheio e o pior caso e ficar sem desconto, nao sem compra.
+      console.error('Nao deu para conferir o codigo de indicacao:', err);
+    }
+  }
+
   /* ---- monta o pagamento ---- */
   const form = (req.body && req.body.formData) || {};
 
   const pagamento = {
     // valor e destinatário são nossos, não do navegador
-    transaction_amount: escolhido.valor,
+    transaction_amount: valorCobrado,
     external_reference: usuario.id,
     description: 'EditorBG VIP — ' + escolhido.nome,
 
     // O webhook precisa saber o que foi comprado para calcular até quando vale.
-    metadata: { plano: escolhido.id },
+    // Quem indicou viaja junto: e assim que a confirmacao, que chega depois e
+    // por outro caminho, descobre para quem vai a comissao.
+    metadata: { plano: escolhido.id, ...(indicadoPor ? { indicado_por: indicadoPor } : {}) },
 
     // o que o Brick coletou
     payment_method_id: form.payment_method_id,
@@ -135,6 +172,8 @@ export default async function handler(req, res) {
     ok: true,
     id: criado.id,
     plano: escolhido.id,
+    valor: valorCobrado,
+    comDesconto: !!indicadoPor,
     status: criado.status,                 // approved | pending | in_process | rejected
     detalhe: criado.status_detail,
     pix: pix

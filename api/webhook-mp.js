@@ -19,6 +19,7 @@
 
 import { liberarPlano } from './_supabase.js';
 import { planoDoPagamento } from '../js/planos.js';
+import { creditarSeIndicado } from './_afiliados.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -113,6 +114,14 @@ export default async function handler(req, res) {
       }),
     });
     if (!r.ok) console.error('Não deu para registrar o pagamento:', await r.text());
+
+    // A comissao vem DEPOIS do pagamento estar gravado: `podeSerIndicado`
+    // consulta a tabela de pagamentos para saber se a pessoa ja era cliente, e
+    // creditar antes leria um estado que ainda nao existe.
+    await creditarSeIndicado(pagamento, usuarioId, planoId, {
+      url: supabaseUrl.replace(/\/$/, ''),
+      chave: serviceKey,
+    });
   } catch (err) {
     console.error('Não deu para registrar o pagamento:', err);
   }

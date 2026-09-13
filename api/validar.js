@@ -17,6 +17,7 @@
  */
 
 import { liberarPlano } from './_supabase.js';
+import { creditarSeIndicado } from './_afiliados.js';
 import { planoDoPagamento } from '../js/planos.js';
 
 export default async function handler(req, res) {
@@ -144,6 +145,15 @@ export default async function handler(req, res) {
     // erro para quem acabou de pagar.
     console.error('Não deu para registrar o pagamento:', err);
   }
+
+  /* ---- 6. paga a comissao de quem indicou ---- */
+  // Depois do registro do pagamento, pelo mesmo motivo do webhook: a
+  // conferencia de "ja e cliente" le a tabela de pagamentos. Gravar duas vezes
+  // nao paga duas vezes — a chave e o id do pagamento.
+  await creditarSeIndicado(pagamento, usuario.id, planoId, {
+    url: supabaseUrl.replace(/\/$/, ''),
+    chave: serviceKey,
+  });
 
   return res.status(200).json({ ok: true, vip: true });
 }

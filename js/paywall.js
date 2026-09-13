@@ -6,7 +6,8 @@ import {
   REDUCAO_GRATIS, ENDPOINT_PAGAR, ENDPOINT_VALIDACAO, MP_PUBLIC_KEY,
   aplicarLimite,
 } from './licenca.js';
-import { PLANOS, ORDEM, PLANO_PADRAO, plano, precoEscrito } from './planos.js';
+import { PLANOS, ORDEM, PLANO_PADRAO, plano, precoEscrito,
+  comDesconto, DESCONTO_INDICACAO } from './planos.js';
 import * as Conta from './conta.js';
 
 // A tela vem junto com o módulo. Antes o markup morava no partial do editor, e
@@ -31,6 +32,32 @@ const modal = $('modalHD');
 const aviso = $('hdAviso');
 let canvasPendente = null;
 let nomePendente = null;
+
+/* ------------------------------------------------------------------ *
+ * Indicacao
+ * ------------------------------------------------------------------ */
+
+/**
+ * O codigo de quem indicou, guardado pelo js/ref.js.
+ *
+ * Aqui ele so muda o que a tela MOSTRA. Quem decide se o desconto vale de
+ * verdade e o servidor, que confere se o codigo existe, se e de outra pessoa e
+ * se quem esta comprando ainda pode ser indicado. Mexer nisto pelo console nao
+ * abate um centavo da cobranca.
+ */
+const indicacao = () => (typeof window.codigoIndicacao === 'function' ? window.codigoIndicacao() : '');
+
+function mostrarIndicacao() {
+  const codigo = indicacao();
+  const linha = $('hdIndicacaoOk');
+  linha.hidden = !codigo;
+  if (codigo) {
+    linha.textContent = 'Desconto de ' + Math.round(DESCONTO_INDICACAO * 100)
+      + '% aplicado pelo código ' + codigo + '.';
+  }
+  $('hdIndicacao').value = codigo;
+  $('hdIndicacao').closest('details').open = false;
+}
 
 /* ------------------------------------------------------------------ *
  * Escolha do plano
@@ -64,7 +91,17 @@ function desenharPlanos() {
 
     const valor = document.createElement('strong');
     valor.className = 'hd-plano-valor';
-    valor.textContent = precoEscrito(id);
+    if (indicacao()) {
+      // O preco cheio fica riscado ao lado. Mostrar so o valor final esconde o
+      // desconto justamente de quem foi conquistado por ele.
+      valor.textContent = 'R$ ' + comDesconto(p.valor).toFixed(2).replace('.', ',');
+      const antes = document.createElement('s');
+      antes.className = 'hd-plano-antes';
+      antes.textContent = precoEscrito(id);
+      valor.append(' ', antes);
+    } else {
+      valor.textContent = precoEscrito(id);
+    }
 
     const nota = document.createElement('small');
     nota.className = 'hd-plano-nota';
@@ -94,7 +131,11 @@ function marcarEscolhido() {
     cartao.classList.toggle('is-escolhido', marcado);
     cartao.setAttribute('aria-checked', marcado ? 'true' : 'false');
   }
-  $('hdPagar').textContent = 'Assinar por ' + precoEscrito(planoEscolhido);
+  const p = plano(planoEscolhido);
+  $('hdPagar').textContent = 'Assinar por '
+    + (indicacao() && p
+      ? 'R$ ' + comDesconto(p.valor).toFixed(2).replace('.', ',')
+      : precoEscrito(planoEscolhido));
 }
 
 /* ------------------------------------------------------------------ *
@@ -160,6 +201,7 @@ export function abrirPaywall(canvas, nome, motivo = null) {
     ? motivo.texto
     : 'O download grátis sai com <strong id="hdLimite">30%</strong> menos resolução.';
   if (!motivo) $('hdLimite').textContent = Math.round(REDUCAO_GRATIS * 100) + '%';
+  mostrarIndicacao();
   desenharPlanos();
   mostrarRenovacao();
   aviso.textContent = '';
@@ -286,6 +328,19 @@ function liberado() {
   }, 700);
 }
 
+$('hdAplicarIndicacao').addEventListener('click', () => {
+  const limpo = window.guardarIndicacao ? window.guardarIndicacao($('hdIndicacao').value) : '';
+  mostrarIndicacao();
+  desenharPlanos();
+  // O Brick ja montado carrega o valor antigo dentro dele: sem remontar, a
+  // pessoa veria o desconto na tela e pagaria o preco cheio.
+  if (brick) abrirFormularioDePagamento();
+  if (!limpo) {
+    $('hdIndicacaoOk').hidden = false;
+    $('hdIndicacaoOk').textContent = 'Código removido. Você paga o preço normal.';
+  }
+});
+
 $('hdEntrar').addEventListener('click', () => {
   fechar();
   // Import sob demanda, não estático: conta-ui.js também chama daqui, e um
@@ -388,7 +443,10 @@ async function enviarPagamento(formData) {
     // O plano vai como id, nunca como preço: quem converte id em valor é o
     // servidor. Mandar o valor daqui seria deixar o navegador escolher quanto
     // pagar.
-    body: JSON.stringify({ formData, plano: planoEscolhido }),
+    // O codigo de indicacao vai junto, mas quem decide se ele vale e o
+    // servidor: ele confere se existe, se e de outra pessoa e se esta pessoa
+    // ainda pode ser indicada. Daqui sai o CODIGO, nunca o preco.
+    body: JSON.stringify({ formData, plano: planoEscolhido, indicacao: indicacao() }),
   });
   const dados = await r.json().catch(() => ({}));
 

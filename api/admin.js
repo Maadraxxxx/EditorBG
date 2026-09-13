@@ -13,6 +13,7 @@
  */
 
 import { ambiente, cabecalhos, usuarioDoToken, lerCargo, rpc } from './_supabase.js';
+import { saqueMinimo } from './_afiliados.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -83,6 +84,19 @@ export default async function handler(req, res) {
 
       case 'definir':
         return res.status(200).json({ ok: true, pessoa: await definir(corpo, usuario, env) });
+
+      case 'saques':
+        return res.status(200).json({
+          ok: true,
+          saques: await listarSaques(env),
+          minimo: await saqueMinimo(env),
+        });
+
+      case 'resolver-saque':
+        return res.status(200).json({ ok: true, saque: await resolverSaque(corpo, env) });
+
+      case 'saque-minimo':
+        return res.status(200).json({ ok: true, minimo: await definirMinimo(corpo, env) });
 
       default:
         return res.status(400).json({ ok: false, motivo: 'Ação desconhecida.' });
@@ -193,4 +207,84 @@ async function definir(corpo, quemPede, env) {
   const alvo = linhas[0];
   console.log('admin', quemPede.email, 'mudou', alvo.email, JSON.stringify(mudancas));
   return alvo;
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Indicacoes: saques e o minimo
+ * ------------------------------------------------------------------ */
+
+/** Os pedidos de saque, os pendentes primeiro. */
+async function listarSaques(env) {
+  const r = await fetch(
+    env.url + '/rest/v1/saques'
+      + '?select=id,afiliado_id,valor,chave_pix,status,motivo,criado_em,resolvido_em'
+      + '&order=status.asc,criado_em.asc&limit=200',
+    { headers: cabecalhos(env.chave) }
+  );
+  if (!r.ok) throw new Error('Nao deu para ler os saques.');
+  const saques = await r.json();
+  if (!saques.length) return saques;
+
+  // O e-mail vem do perfil, numa consulta so: sem isto, a tela mostraria um
+  // uuid e ninguem saberia para quem esta pagando.
+  const ids = [...new Set(saques.map((s) => s.afiliado_id))];
+  const rp = await fetch(
+    env.url + '/rest/v1/perfis?select=id,email&id=in.(' + ids.join(',') + ')',
+    { headers: cabecalhos(env.chave) }
+  );
+  const perfis = rp.ok ? await rp.json() : [];
+  const porId = Object.fromEntries(perfis.map((p) => [p.id, p.email]));
+  return saques.map((s) => ({ ...s, email: porId[s.afiliado_id] || null }));
+}
+
+/**
+ * Marca um saque como pago ou recusado.
+ *
+ * Recusar DEVOLVE o dinheiro ao saldo, porque o calculo do saldo so desconta
+ * saque 'pedido' ou 'pago'. Por isso a recusa pede um motivo: quem pediu vai
+ * ver o saldo voltar e precisa entender por que.
+ */
+async function resolverSaque(corpo, env) {
+  const id = String(corpo.id || '');
+  const status = corpo.status;
+  if (!id) throw recusa('Qual saque?');
+  if (status !== 'pago' && status !== 'recusado') throw recusa('Situacao invalida.');
+  if (status === 'recusado' && !String(corpo.motivo || '').trim()) {
+    throw recusa('Escreva o motivo da recusa.');
+  }
+
+  const r = await fetch(env.url + '/rest/v1/saques?id=eq.' + encodeURIComponent(id)
+    + '&status=eq.pedido', {
+    method: 'PATCH',
+    headers: cabecalhos(env.chave, { Prefer: 'return=representation' }),
+    body: JSON.stringify({
+      status,
+      motivo: String(corpo.motivo || '').trim() || null,
+      resolvido_em: new Date().toISOString(),
+    }),
+  });
+  if (!r.ok) throw new Error('Nao deu para atualizar o saque.');
+
+  const linhas = await r.json();
+  // O filtro status=eq.pedido e a protecao contra dois cliques: o segundo nao
+  // acha linha nenhuma em vez de reescrever um saque ja resolvido.
+  if (!linhas.length) throw recusa('Este saque ja tinha sido resolvido.');
+  return linhas[0];
+}
+
+/** Muda o minimo para sacar, sem publicar codigo novo. */
+async function definirMinimo(corpo, env) {
+  const valor = Number(corpo.valor);
+  if (!Number.isFinite(valor) || valor <= 0 || valor > 100000) {
+    throw recusa('Valor invalido para o saque minimo.');
+  }
+  const r = await fetch(env.url + '/rest/v1/configuracoes?chave=eq.saque_minimo', {
+    method: 'PATCH',
+    headers: cabecalhos(env.chave, { Prefer: 'return=representation' }),
+    body: JSON.stringify({ valor, atualizado_em: new Date().toISOString() }),
+  });
+  if (!r.ok) throw new Error('Nao deu para gravar o minimo.');
+  const linhas = await r.json();
+  return linhas[0] ? Number(linhas[0].valor) : valor;
 }

@@ -2933,3 +2933,93 @@ body[data-mode="imagem"] main { max-width: 1400px; }
   gap: 10px;
   margin-top: 4px;
 }
+
+/* ------------------------------------------------------------------ *
+ * Indique e ganhe
+ * ------------------------------------------------------------------ */
+.af-painel { display: flex; flex-direction: column; gap: 16px; max-width: 820px; margin: 22px auto 0; }
+.af-deslogado {
+  display: grid; justify-items: center; gap: 14px;
+  max-width: 520px; margin: 30px auto; padding: 28px 22px; text-align: center;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+}
+
+.af-cartao {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 18px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.af-destaque { border-color: rgba(99, 102, 241, .45); }
+
+.af-rotulo {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.af-numero { font-size: 26px; font-variant-numeric: tabular-nums; }
+.af-numero.forte { color: var(--accent); }
+.af-cartao small { font-size: 12px; color: var(--muted); }
+
+.af-numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+.af-linha { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.af-linha input {
+  flex: 1 1 220px; min-width: 0;
+  padding: 10px 12px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+}
+.af-codigo {
+  flex: 1 1 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 20px; font-weight: 700; letter-spacing: .16em;
+  padding: 8px 12px; border-radius: 10px; background: var(--realce-2);
+}
+
+.af-titulo { margin: 10px 0 0; font-size: 15px; }
+/* A tabela rola dentro da propria caixa: sem isto, num celular ela empurraria
+   a pagina inteira para o lado. */
+.af-tabela-caixa { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.af-tabela { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--card); }
+.af-tabela th, .af-tabela td { padding: 10px 12px; text-align: left; white-space: nowrap; }
+.af-tabela th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.af-tabela tbody tr + tr td { border-top: 1px solid var(--line); }
+.af-tabela .num { text-align: right; font-variant-numeric: tabular-nums; }
+.af-tabela .forte { font-weight: 700; color: var(--accent); }
+.af-tabela .vazio { color: var(--muted); text-align: center; white-space: normal; }
+
+.sit { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.sit.aguardando { background: color-mix(in srgb, #9a6700 14%, transparent); color: #9a6700; }
+.sit.bom { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.sit.ruim { background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); }
+
+.ed-hint.centro { text-align: center; }
+
+/* Desconto de indicacao na tela de assinatura */
+.hd-indicacao-ok {
+  margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+  color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+/* O preco antigo vai em linha propria: em linha com o novo, "R$ 3,92 R$ 4,90"
+   quebrava no meio do valor riscado e virava "R$ 3,92 R$ / 4,90". */
+.hd-plano-antes {
+  display: block;
+  opacity: .55;
+  font-size: .72em;
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+@media (max-width: 640px) {
+  .af-numeros { grid-template-columns: 1fr; }
+}
+
+/* Saques no painel do admin */
+.admin-cabeca { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; }
+.ed-field.compacto { max-width: 180px; }
+.ed-field.compacto input { width: 100%; }
+.btn.pequeno { padding: 5px 10px; font-size: 12px; }
+.adm-pix {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; padding: 2px 6px; border-radius: 6px; background: var(--realce-2);
+  /* A chave inteira, sem cortar: cortada, nao da para colar no banco. */
+  white-space: nowrap;
+}

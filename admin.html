@@ -6,6 +6,7 @@
   <title>Painel · EditorBG</title>
   <meta name="robots" content="noindex" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script src="/js/ref.js"></script>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -146,6 +147,31 @@
 
       <p class="admin-vazio" id="admVazio" hidden>Nenhuma conta encontrada.</p>
       <p class="hd-aviso" id="admAviso"></p>
+    </section>
+
+    <section class="admin-secao">
+      <div class="admin-cabeca">
+        <h2>Saques de indicação</h2>
+        <div class="af-linha">
+          <label class="ed-field compacto">Mínimo para sacar
+            <input type="number" id="admMinimo" min="1" max="100000" step="1" />
+          </label>
+          <button class="btn ghost" id="admSalvarMinimo" type="button">Salvar mínimo</button>
+        </div>
+      </div>
+
+      <div class="af-tabela-caixa">
+        <table class="af-tabela">
+          <thead>
+            <tr>
+              <th>Quando</th><th>Quem</th><th class="num">Valor</th>
+              <th>Chave PIX</th><th>Situação</th><th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="admSaques"></tbody>
+        </table>
+      </div>
+      <p class="hd-aviso" id="admSaqueAviso"></p>
     </section>
 
   </div>

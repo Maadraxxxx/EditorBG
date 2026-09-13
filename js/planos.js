@@ -60,6 +60,24 @@ export function precoEscrito(id) {
   return p ? 'R$ ' + p.valor.toFixed(2).replace('.', ',') : '—';
 }
 
+/* ------------------------------------------------------------------ *
+ * Indicacao
+ * ------------------------------------------------------------------ */
+
+/** Quanto quem chega por indicacao paga a menos, e quanto quem indicou ganha. */
+export const DESCONTO_INDICACAO = 0.20;
+export const COMISSAO_INDICACAO = 0.20;
+
+/** O preco de um plano para quem chegou com codigo de indicacao. */
+export function comDesconto(valor) {
+  return Math.round(Number(valor) * (1 - DESCONTO_INDICACAO) * 100) / 100;
+}
+
+export function precoEscritoComDesconto(id) {
+  const p = plano(id);
+  return p ? 'R$ ' + comDesconto(p.valor).toFixed(2).replace('.', ',') : '—';
+}
+
 /**
  * Qual plano custa este valor.
  *
@@ -70,7 +88,13 @@ export function precoEscrito(id) {
 export function planoPeloValor(valor) {
   const v = Number(valor);
   if (!Number.isFinite(v)) return undefined;
-  return ORDEM.map((id) => PLANOS[id]).find((p) => Math.abs(p.valor - v) < 0.005);
+  // O preco com desconto de indicacao conta como o mesmo plano. SEM ISTO o
+  // sistema de indicacao quebraria calado: R$ 15,92 nao bate com plano nenhum,
+  // a conferencia cairia no campo de metadata e, na falta dele, entregaria
+  // VITALICIO para quem pagou o mensal com desconto.
+  return ORDEM.map((id) => PLANOS[id]).find(
+    (p) => Math.abs(p.valor - v) < 0.005 || Math.abs(comDesconto(p.valor) - v) < 0.005
+  );
 }
 
 /**
