@@ -3006,6 +3006,13 @@ body[data-mode="imagem"] main { max-width: 1400px; }
  * ali.
  */
 .hd-indicacao {
+  /* O .hd-card e display:block sem gap, entao o espaco tem que vir daqui: sem
+     isto o cartao encostava no botao de assinar, sem folga nenhuma.
+
+     18 em cima, e nao 14: margens verticais vizinhas COLAPSAM em vez de somar,
+     entao o que vale e o maior entre este e os 4 que os planos deixam embaixo.
+     18 e o mesmo vao que o modal usa entre os outros blocos. */
+  margin: 18px 0 16px;
   border: 1px dashed rgba(99, 102, 241, .5);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(99, 102, 241, .05), transparent);
@@ -3071,6 +3078,9 @@ body[data-mode="imagem"] main { max-width: 1400px; }
 
 /* Aplicado */
 .hd-ind-aplicado {
+  /* O mesmo respiro do convite: os dois ocupam o mesmo lugar na tela e trocam
+     entre si, entao uma folga diferente faria o modal pular ao aplicar. */
+  margin: 18px 0 16px;
   display: flex; align-items: center; gap: 9px;
   padding: 10px 13px; border-radius: 14px;
   font-size: 13px; font-weight: 600;
