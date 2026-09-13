@@ -26,6 +26,7 @@ const PAGINAS = {
   'admin.html': ['js/admin.js'],
   'imagem.html': ['js/pagina-imagem.js'],
   'qrcode.html': ['js/pagina-qrcode.js'],
+  'foto-documento.html': ['js/pagina-foto.js'],
 };
 
 /** Partials que entram em toda página por injeção. */

@@ -33,6 +33,24 @@ export const MODELS = {
 };
 
 /**
+ * Um canvas, venha de onde vier.
+ *
+ * Este modulo roda em dois lugares: na pagina, onde existe `document`, e dentro
+ * de um Web Worker, onde nao existe. Sem isto, mover o recorte para fora da
+ * thread principal — que e a regra do projeto para trabalho pesado — exigiria
+ * uma segunda copia da mesma logica, e duas copias divergem.
+ */
+function novoCanvas(largura, altura) {
+  if (typeof document !== 'undefined') {
+    const c = document.createElement('canvas');
+    c.width = largura;
+    c.height = altura;
+    return c;
+  }
+  return new OffscreenCanvas(largura, altura);
+}
+
+/**
  * `navigator.gpu` existir não garante WebGPU: em muitos PCs o adapter não é
  * concedido. Só uma requisição real responde isso.
  */
@@ -140,9 +158,7 @@ async function cairParaProcessador() {
 
 /** Roda o modelo num recorte da imagem e devolve a máscara daquele recorte. */
 async function segmentRegion(segmenter, bitmap, sx, sy, sw, sh) {
-  const c = document.createElement('canvas');
-  c.width = sw;
-  c.height = sh;
+  const c = novoCanvas(sw, sh);
   const ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, sw, sh);
   const rgba = ctx.getImageData(0, 0, sw, sh);
@@ -171,9 +187,7 @@ async function segmentRegion(segmenter, bitmap, sx, sy, sw, sh) {
 
 /** RawImage RGBA -> canvas branco cujo ALPHA é a máscara. */
 function alphaToMask(res, w, h) {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
+  const c = novoCanvas(w, h);
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(w, h);
   const dst = img.data;
@@ -248,9 +262,7 @@ export async function segmentImage(segmenter, bitmap, { twoPass = true, onStatus
   const second = await segmentRegion(segmenter, bitmap, sx, sy, sw, sh);
 
   // Fora do recorte já era fundo na 1ª passada, então fica transparente.
-  const out = document.createElement('canvas');
-  out.width = w;
-  out.height = h;
+  const out = novoCanvas(w, h);
   out.getContext('2d').drawImage(second, sx, sy);
   return out;
 }
@@ -280,9 +292,7 @@ const LADO_SERVIDOR = 1024;
  * o próprio modelo faz internamente; fazer aqui só adianta o trabalho.
  */
 export async function recortarNoServidor(bitmap, token) {
-  const quadrado = document.createElement('canvas');
-  quadrado.width = LADO_SERVIDOR;
-  quadrado.height = LADO_SERVIDOR;
+  const quadrado = novoCanvas(LADO_SERVIDOR, LADO_SERVIDOR);
   const ctx = quadrado.getContext('2d', { willReadFrequently: true });
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
@@ -314,9 +324,7 @@ export async function recortarNoServidor(bitmap, token) {
 
   /* A máscara volta em tons de cinza no quadrado; volta ao tamanho da imagem. */
   const cinza = deBase64(resposta.mascara);
-  const mascaraQuadrada = document.createElement('canvas');
-  mascaraQuadrada.width = LADO_SERVIDOR;
-  mascaraQuadrada.height = LADO_SERVIDOR;
+  const mascaraQuadrada = novoCanvas(LADO_SERVIDOR, LADO_SERVIDOR);
   const mctx = mascaraQuadrada.getContext('2d');
   const img = mctx.createImageData(LADO_SERVIDOR, LADO_SERVIDOR);
   for (let i = 0, n = LADO_SERVIDOR * LADO_SERVIDOR; i < n; i++) {
@@ -327,9 +335,7 @@ export async function recortarNoServidor(bitmap, token) {
   }
   mctx.putImageData(img, 0, 0);
 
-  const final = document.createElement('canvas');
-  final.width = bitmap.width;
-  final.height = bitmap.height;
+  const final = novoCanvas(bitmap.width, bitmap.height);
   const fctx = final.getContext('2d');
   fctx.imageSmoothingEnabled = true;
   fctx.imageSmoothingQuality = 'high';

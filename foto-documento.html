@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foto 3x4 online grátis — fundo branco e folha para imprimir</title>
+  <meta name="description" content="Faça sua foto 3x4 para RG, CNH e concursos com fundo branco automático. Também 5x7, visto americano e Schengen, com folha 10x15 pronta para revelar. Sem enviar a foto para servidores." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="canonical" href="https://editorbg.com.br/foto-documento" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="EditorBG" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:url" content="https://editorbg.com.br/foto-documento" />
+  <meta property="og:title" content="Foto 3x4 online grátis — fundo branco e folha para imprimir" />
+  <meta property="og:description" content="Faça sua foto 3x4 para RG, CNH e concursos com fundo branco automático. Também 5x7, visto americano e Schengen, com folha 10x15 pronta para revelar." />
+  <meta property="og:image" content="https://editorbg.com.br/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-mode="foto">
+
+<header class="topbar">
+  <a class="brand" href="/" title="Voltar para o início">
+    <div class="logo-marca" aria-hidden="true">
+      <span class="logo-tile logo-recorte">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.5v15h15"/><path d="M2.5 6.5h15v15"/></svg>
+      </span>
+      <span class="logo-tile logo-brilho">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 3.5 11.6 8 16 9.6 11.6 11.2 10 15.7 8.4 11.2 4 9.6 8.4 8Z"/>
+          <path d="M17 15.2 17.8 17.4 20 18.2 17.8 19 17 21.2 16.2 19 14 18.2 16.2 17.4Z"/>
+        </svg>
+      </span>
+      <span class="logo-tile logo-tesoura">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/>
+          <path d="M20 4 8.7 16.2"/><path d="M20 20 8.7 7.8"/>
+        </svg>
+      </span>
+      <span class="logo-tile logo-pdf">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.5 3H7a1.4 1.4 0 0 0-1.4 1.4v15.2A1.4 1.4 0 0 0 7 21h10a1.4 1.4 0 0 0 1.4-1.4V8Z"/>
+          <path d="M13.5 3v5h4.9"/>
+        </svg>
+      </span>
+    </div>
+    <div>
+      <h1>EditorBG</h1>
+      <p>Foto de documento — direto no seu navegador</p>
+    </div>
+  </a>
+</header>
+
+<main>
+
+  <section class="dropzone" id="drop" tabindex="0" role="button" aria-label="Escolher a foto">
+    <div class="dz-icon">🪪</div>
+    <h2>Arraste sua foto aqui</h2>
+    <p>ou <span class="link">clique para escolher</span> · você também pode colar com <kbd>Ctrl</kbd>+<kbd>V</kbd></p>
+    <small>3×4, 5×7, visto americano e Schengen · fundo branco automático · nada é enviado para servidores</small>
+    <input type="file" id="file" accept="image/*" hidden />
+  </section>
+
+  <section class="foto-tela" id="trabalho" hidden>
+
+    <div class="foto-palco">
+      <canvas id="previa" title="Arraste para mover · role para aproximar"></canvas>
+      <p class="img-medidas" id="medidas">—</p>
+      <p class="ed-hint small centro" id="dica">Arraste a foto para mover e role o mouse para aproximar.</p>
+    </div>
+
+    <aside class="foto-lado">
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Formato</span>
+        <div class="seg coluna" id="formatos">
+          <button data-formato="3x4" class="is-active" type="button">3 × 4 cm</button>
+          <button data-formato="5x7" type="button">5 × 7 cm</button>
+          <button data-formato="eua" type="button">Visto EUA</button>
+          <button data-formato="schengen" type="button">Schengen</button>
+        </div>
+        <p class="ed-hint small" id="formatoDetalhe">RG, CNH, carteira de trabalho, crachá, concursos</p>
+      </div>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Fundo</span>
+        <label class="switch small">
+          <input type="checkbox" id="semFundo" checked />
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-text">Trocar o fundo automaticamente</span>
+        </label>
+
+        <div class="seg" id="fundos">
+          <button data-fundo="#ffffff" class="is-active" type="button">Branco</button>
+          <button data-fundo="#f2f4f7" type="button">Cinza claro</button>
+          <button data-fundo="#dbeafe" type="button">Azul claro</button>
+        </div>
+
+        <label class="cor-campo">Outra cor <input type="color" id="corFundo" value="#ffffff" /></label>
+        <p class="ed-hint small">
+          Quase todo documento brasileiro pede fundo branco. As outras cores
+          servem para crachá e carteirinha, que costumam aceitar.
+        </p>
+      </div>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Enquadramento</span>
+        <label class="ed-field">
+          Aproximar
+          <input type="range" id="zoom" min="10" max="400" step="1" value="100" />
+        </label>
+        <button class="btn ghost full" id="reenquadrar" type="button">Enquadrar sozinho de novo</button>
+
+        <label class="switch small">
+          <input type="checkbox" id="guias" checked />
+          <span class="track"><span class="knob"></span></span>
+          <span class="switch-text">Mostrar as guias</span>
+        </label>
+        <p class="ed-hint small">
+          A cabeça, do queixo ao alto, deve ficar entre as duas linhas. As guias
+          são só da tela — não vão para o arquivo baixado.
+        </p>
+      </div>
+
+      <div class="mq-bloco">
+        <span class="mq-titulo">Arquivo</span>
+        <label class="ed-field">
+          <select id="tipoArquivo">
+            <option value="png">PNG · com a resolução gravada dentro</option>
+            <option value="jpg">JPG · aceito em qualquer lugar</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="pdf-aviso" id="aviso" hidden></p>
+
+      <button class="btn primary full" id="baixarFoto">Baixar a foto</button>
+      <button class="btn primary full" id="baixarFolha">Baixar folha 10 × 15 cm</button>
+      <button class="btn ghost full" id="trocar" type="button">Trocar a foto</button>
+    </aside>
+
+  </section>
+
+  <section class="conteudo">
+    <h2>Sobre a foto de documento</h2>
+
+    <h3>O tamanho impresso é o que faz a foto ser aceita</h3>
+    <p>
+      Uma foto 3×4 não é "uma foto pequena": são 30 por 40 milímetros no papel.
+      Aqui tudo é calculado em milímetro e convertido para pixel só no fim, a
+      300 DPI — e a resolução fica gravada dentro do arquivo PNG. Sem essa
+      informação, o programa de impressão usa o palpite dele, normalmente 96
+      DPI, e a mesma foto sairia com quase 9 por 12 centímetros. Os pixels
+      estariam certos e o documento seria recusado assim mesmo.
+    </p>
+
+    <h3>A folha 10 × 15 é a forma barata de imprimir</h3>
+    <p>
+      Qualquer laboratório ou farmácia revela uma foto 10 por 15 por poucos
+      reais, e nela cabem nove fotos 3×4 com as linhas de corte já no lugar. Sai
+      bem mais barato que pedir "foto 3×4" no balcão, e o resultado é o mesmo
+      papel fotográfico.
+    </p>
+
+    <h3>Como o enquadramento é sugerido</h3>
+    <p>
+      Depois de separar você do fundo, a silhueta é lida linha a linha: ela
+      cresce no crânio, estreita no pescoço e volta a crescer nos ombros. Esse
+      estreitamento marca a altura do queixo, e a partir dele a foto é
+      enquadrada na proporção que o formato escolhido pede. É uma estimativa, e
+      cabelo comprido, gorro ou cachecol podem enganá-la — por isso o resultado
+      é só o ponto de partida, com as guias à vista e o ajuste na sua mão.
+    </p>
+
+    <details class="faq">
+      <summary>Minha foto é enviada para algum servidor?</summary>
+      <p>
+        Não. Tanto a troca de fundo quanto o corte acontecem dentro do seu
+        navegador. Depois que a página carregou você pode desligar a internet e
+        continuar usando.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Posso tirar a foto com o celular mesmo?</summary>
+      <p>
+        Pode, e é o caso mais comum. Vale cuidar de três coisas que nenhum
+        programa conserta depois: luz vindo da frente e não de trás, rosto
+        olhando direto para a câmera, e expressão neutra. O fundo não precisa
+        ser branco — é ele que a ferramenta troca.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>Serve para passaporte e visto?</summary>
+      <p>
+        Os tamanhos e a altura da cabeça seguem o que cada exigência publica:
+        2×2 polegadas com a cabeça entre 25 e 35 mm no visto americano, e
+        3,5×4,5 cm com a cabeça entre 32 e 36 mm no Schengen. O que a
+        ferramenta não pode garantir é o resto da exigência — óculos, sorriso,
+        sombra no fundo e a data da foto continuam por sua conta, e são
+        motivo de recusa tanto quanto a medida.
+      </p>
+    </details>
+
+    <details class="faq">
+      <summary>O fundo ficou com falha em volta do cabelo</summary>
+      <p>
+        Acontece quando o fundo original tem cor parecida com a do cabelo.
+        Desligue a troca automática, refaça a foto contra uma parede de cor bem
+        diferente e tente de novo — é mais rápido do que corrigir depois. Para
+        acertar na mão fio a fio, a página de
+        <a href="/remover-fundo">remover fundo</a> tem pincel de recuperar e apagar.
+      </p>
+    </details>
+  </section>
+
+</main>
+
+<script type="module" src="js/pagina-foto.js"></script>
+
+</body>
+</html>
