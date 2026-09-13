@@ -2993,11 +2993,99 @@ body[data-mode="imagem"] main { max-width: 1400px; }
 
 .ed-hint.centro { text-align: center; }
 
-/* Desconto de indicacao na tela de assinatura */
-.hd-indicacao-ok {
-  margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
-  color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent);
+/* ------------------------------------------------------------------ *
+ * Codigo de indicacao na tela de assinatura
+ * ------------------------------------------------------------------ */
+
+/*
+ * O <details> nu nao servia.
+ *
+ * Sem estilo nenhum ele saia como o triangulinho cinza do navegador, no meio
+ * de uma tela toda desenhada — parecia sobra de depuracao, e nao um desconto
+ * de 20% esperando para ser usado. Quem nao sabia que existia nao ia procurar
+ * ali.
+ */
+.hd-indicacao {
+  border: 1px dashed rgba(99, 102, 241, .5);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, .05), transparent);
+  overflow: hidden;
+  transition: border-color .18s, background .18s;
 }
+.hd-indicacao:hover { border-color: rgba(99, 102, 241, .8); }
+.hd-indicacao[open] {
+  border-style: solid;
+  background: rgba(99, 102, 241, .05);
+}
+
+.hd-indicacao summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  cursor: pointer;
+  text-align: left;
+  list-style: none;          /* Firefox */
+}
+/* O triangulo padrao do navegador nao combina com nada daqui. */
+.hd-indicacao summary::-webkit-details-marker { display: none; }
+.hd-indicacao summary::marker { content: ''; }
+.hd-indicacao summary:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+.hd-ind-icone {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; flex: 0 0 34px;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(135deg, #818cf8, var(--accent) 55%, #4f46e5);
+}
+
+.hd-ind-texto { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.hd-ind-texto strong { font-size: 13.5px; }
+.hd-ind-texto small { font-size: 11.5px; color: var(--muted); }
+
+/* O quanto se ganha fica a vista ANTES de abrir: e a unica informacao que faz
+   alguem clicar. */
+.hd-ind-selo {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: linear-gradient(135deg, #34d399, #059669);
+}
+
+.hd-ind-corpo { display: flex; flex-direction: column; gap: 8px; padding: 0 13px 13px; }
+.hd-ind-linha { display: flex; gap: 8px; }
+.hd-ind-linha input {
+  flex: 1 1 auto; min-width: 0;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card);
+}
+.hd-ind-linha input:focus { outline: none; border-color: var(--accent); }
+.hd-ind-linha .btn { flex: 0 0 auto; }
+.hd-ind-nota { margin: 0; font-size: 11.5px; color: var(--muted); }
+
+/* Aplicado */
+.hd-ind-aplicado {
+  display: flex; align-items: center; gap: 9px;
+  padding: 10px 13px; border-radius: 14px;
+  font-size: 13px; font-weight: 600;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 32%, transparent);
+}
+.hd-ind-aplicado span { flex: 1 1 auto; }
+.hd-ind-aplicado button {
+  flex: 0 0 auto;
+  border: 0; background: none; padding: 2px 4px;
+  font: inherit; font-weight: 600; font-size: 11.5px;
+  color: var(--muted); text-decoration: underline; cursor: pointer;
+}
+.hd-ind-aplicado button:hover { color: var(--err); }
 /* O preco antigo vai em linha propria: em linha com o novo, "R$ 3,92 R$ 4,90"
    quebrava no meio do valor riscado e virava "R$ 3,92 R$ / 4,90". */
 .hd-plano-antes {

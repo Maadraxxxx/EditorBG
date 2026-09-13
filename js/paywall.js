@@ -47,16 +47,37 @@ let nomePendente = null;
  */
 const indicacao = () => (typeof window.codigoIndicacao === 'function' ? window.codigoIndicacao() : '');
 
+/**
+ * Um estado por vez: ou o convite, ou a confirmacao.
+ *
+ * Mostrar os dois juntos fazia a pessoa com desconto aplicado continuar vendo
+ * "Tem um codigo de indicacao?" logo abaixo do aviso de que ja tinha — e
+ * procurar onde tirar, se quisesse.
+ */
 function mostrarIndicacao() {
   const codigo = indicacao();
-  const linha = $('hdIndicacaoOk');
-  linha.hidden = !codigo;
+
+  $('hdIndicacaoOk').hidden = !codigo;
+  $('hdIndicacaoCaixa').hidden = !!codigo;
+
   if (codigo) {
-    linha.textContent = 'Desconto de ' + Math.round(DESCONTO_INDICACAO * 100)
-      + '% aplicado pelo código ' + codigo + '.';
+    $('hdIndicacaoTexto').textContent = Math.round(DESCONTO_INDICACAO * 100)
+      + '% de desconto pelo código ' + codigo;
+  } else {
+    $('hdIndicacao').value = '';
+    $('hdIndicacaoCaixa').open = false;
   }
-  $('hdIndicacao').value = codigo;
-  $('hdIndicacao').closest('details').open = false;
+}
+
+/** Aplica ou tira o codigo e redesenha os precos. */
+function trocarIndicacao(codigo) {
+  const limpo = window.guardarIndicacao ? window.guardarIndicacao(codigo) : '';
+  mostrarIndicacao();
+  desenharPlanos();
+  // O Brick ja montado carrega o valor antigo dentro dele: sem remontar, a
+  // pessoa veria o desconto na tela e pagaria o preco cheio.
+  if (brick) abrirFormularioDePagamento();
+  return limpo;
 }
 
 /* ------------------------------------------------------------------ *
@@ -329,16 +350,21 @@ function liberado() {
 }
 
 $('hdAplicarIndicacao').addEventListener('click', () => {
-  const limpo = window.guardarIndicacao ? window.guardarIndicacao($('hdIndicacao').value) : '';
-  mostrarIndicacao();
-  desenharPlanos();
-  // O Brick ja montado carrega o valor antigo dentro dele: sem remontar, a
-  // pessoa veria o desconto na tela e pagaria o preco cheio.
-  if (brick) abrirFormularioDePagamento();
-  if (!limpo) {
-    $('hdIndicacaoOk').hidden = false;
-    $('hdIndicacaoOk').textContent = 'Código removido. Você paga o preço normal.';
+  if (!trocarIndicacao($('hdIndicacao').value)) {
+    // Campo vazio: nao ha o que aplicar, e a caixa fica aberta com o foco no
+    // lugar certo em vez de fechar como se tivesse funcionado.
+    $('hdIndicacaoCaixa').open = true;
+    $('hdIndicacao').focus();
   }
+});
+
+$('hdIndicacao').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); $('hdAplicarIndicacao').click(); }
+});
+
+$('hdTirarIndicacao').addEventListener('click', () => {
+  trocarIndicacao('');
+  $('hdIndicacaoCaixa').open = true;
 });
 
 $('hdEntrar').addEventListener('click', () => {
