@@ -29,6 +29,17 @@ export const ehVip = temHD;
 const $ = (id) => document.getElementById(id);
 
 const modal = $('modalHD');
+/*
+ * O cartao DESTE modal, procurado a partir dele e nunca do documento.
+ *
+ * `document.querySelector('.hd-card')` devolve o PRIMEIRO cartao da pagina, e
+ * existem dois: o do paywall e o da tela de conta. Qual entra primeiro no DOM
+ * depende de qual `fetch` de partial responde antes — e uma das ordens fazia a
+ * classe do passo de pagamento ser aplicada no cartao ERRADO. O resultado era
+ * o formulario aparecer embaixo dos planos, exatamente como antes, de forma
+ * intermitente e sem erro nenhum no console.
+ */
+const cartao = modal.querySelector('.hd-card');
 const aviso = $('hdAviso');
 let canvasPendente = null;
 let nomePendente = null;
@@ -177,7 +188,7 @@ function marcarEscolhido() {
  * volta a caber centralizado na tela.
  */
 function passoDePagamento(ligado) {
-  document.querySelector('.hd-card').classList.toggle('is-pagando', ligado);
+  cartao.classList.toggle('is-pagando', ligado);
   $('hdResumo').hidden = !ligado;
 
   if (ligado) {
@@ -245,7 +256,7 @@ export function abrirPaywall(canvas, nome, motivo = null) {
 
   // Sem canvas a tela abre como convite ao plano, sem a comparação de medidas.
   const comparar = !!canvas;
-  document.querySelector('.hd-comparacao').hidden = !comparar;
+  modal.querySelector('.hd-comparacao').hidden = !comparar;
   if (comparar) {
     const menor = aplicarLimite(canvas, false);
     $('hdTamGratis').textContent = menor.width + ' × ' + menor.height;
