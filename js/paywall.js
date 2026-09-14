@@ -160,6 +160,41 @@ function marcarEscolhido() {
 }
 
 /* ------------------------------------------------------------------ *
+ * Os dois passos da tela
+ * ------------------------------------------------------------------ */
+
+/**
+ * Escolher o plano e pagar viram TELAS SEPARADAS, e nao uma so comprida.
+ *
+ * Antes o formulario do Mercado Pago era acrescentado embaixo de tudo: a lista
+ * de vantagens, os tres planos e o codigo de indicacao continuavam ali em cima,
+ * e o cartao passava de 1500px. Mesmo com a rolagem consertada, quem clicava em
+ * assinar tinha que rolar para achar onde pagar — e o que importa naquele
+ * momento e so uma coisa.
+ *
+ * No passo de pagamento fica o essencial: o que esta sendo comprado, por
+ * quanto, uma seta para voltar e o formulario. O resto some, o cartao encolhe e
+ * volta a caber centralizado na tela.
+ */
+function passoDePagamento(ligado) {
+  document.querySelector('.hd-card').classList.toggle('is-pagando', ligado);
+  $('hdResumo').hidden = !ligado;
+
+  if (ligado) {
+    const p = plano(planoEscolhido);
+    const comCodigo = !!indicacao();
+    $('hdResumoPlano').textContent = 'EditorBG VIP · ' + (p ? p.nome : '');
+    $('hdResumoValor').textContent = p
+      ? 'R$ ' + (comCodigo ? comDesconto(p.valor) : p.valor).toFixed(2).replace('.', ',')
+        + (comCodigo ? ' (com desconto)' : '')
+      : '';
+    // O modal pode estar rolado da tela anterior: comecar o passo novo no meio
+    // dele seria comecar perdido.
+    modal.scrollTop = 0;
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Download
  * ------------------------------------------------------------------ */
 function nomeDeSaida(nome, hd) {
@@ -268,7 +303,20 @@ function fechar() {
   $('hdBrick').innerHTML = '';
   $('hdPix').hidden = true;
   $('hdPagar').hidden = false;
+  passoDePagamento(false);
 }
+
+/** A seta volta para a escolha do plano, sem fechar a tela inteira. */
+$('hdVoltar').addEventListener('click', () => {
+  if (brick) { try { brick.unmount(); } catch { /* ja foi */ } brick = null; }
+  $('hdBrick').hidden = true;
+  $('hdBrick').innerHTML = '';
+  $('hdPix').hidden = true;
+  $('hdPagar').hidden = false;
+  $('hdPagar').disabled = false;
+  mostrarAviso('');
+  passoDePagamento(false);
+});
 
 $('hdFechar').addEventListener('click', fechar);
 modal.addEventListener('click', (e) => { if (e.target === modal) fechar(); });
@@ -422,6 +470,7 @@ async function abrirFormularioDePagamento() {
     $('hdBrick').innerHTML = '';
     $('hdBrick').hidden = false;
     $('hdPagar').hidden = true;
+    passoDePagamento(true);
 
     const mp = new window.MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
     brick = await mp.bricks().create('payment', 'hdBrick', {

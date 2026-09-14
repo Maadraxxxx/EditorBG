@@ -3162,3 +3162,58 @@ body[data-mode="imagem"] main { max-width: 1400px; }
   /* A chave inteira, sem cortar: cortada, nao da para colar no banco. */
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------------------ *
+ * Passo de pagamento
+ * ------------------------------------------------------------------ */
+
+/*
+ * No passo de pagamento some tudo o que era sobre ESCOLHER.
+ *
+ * A lista de vantagens, os tres planos e o codigo de indicacao ja cumpriram o
+ * papel deles quando a pessoa clicou em assinar. Mantidos na tela, empurravam o
+ * formulario para 1500px abaixo do topo — e o que importa naquele momento e uma
+ * coisa so: pagar.
+ */
+.hd-card.is-pagando .hd-selo,
+.hd-card.is-pagando #hdTitulo,
+.hd-card.is-pagando #hdSub,
+.hd-card.is-pagando .hd-comparacao,
+.hd-card.is-pagando .hd-lista,
+.hd-card.is-pagando #hdPlanos,
+.hd-card.is-pagando #hdIndicacaoOk,
+.hd-card.is-pagando #hdIndicacaoCaixa,
+.hd-card.is-pagando #hdRenova,
+.hd-card.is-pagando #hdEntrar,
+.hd-card.is-pagando #hdPagar,
+.hd-card.is-pagando .hd-codigo {
+  display: none;
+}
+
+/* Sem o selo grande no topo, a folga de cima fica exagerada. */
+.hd-card.is-pagando { padding-top: 22px; }
+
+.hd-resumo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--realce-2);
+}
+.hd-resumo-texto { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hd-resumo-texto small { font-size: 11.5px; color: var(--muted); }
+.hd-resumo-texto strong { font-size: 17px; letter-spacing: -.2px; }
+
+.hd-voltar {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; flex: 0 0 34px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--txt);
+  cursor: pointer;
+}
+.hd-voltar:hover { border-color: var(--accent); color: var(--accent); }
+.hd-voltar:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }

@@ -84,6 +84,21 @@
     <button class="btn primary full" id="hdPagar">Assinar agora</button>
 
     <!-- O Payment Brick do Mercado Pago é montado aqui, sob demanda. -->
+    <!-- Cabecalho do passo de pagamento. Sem ele, ao trocar de tela a pessoa
+         perderia de vista o que esta comprando e por quanto. -->
+    <div class="hd-resumo" id="hdResumo" hidden>
+      <button class="hd-voltar" id="hdVoltar" type="button" title="Escolher outro plano">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 5 8 12l7 7"/>
+        </svg>
+      </button>
+      <span class="hd-resumo-texto">
+        <small id="hdResumoPlano">—</small>
+        <strong id="hdResumoValor">—</strong>
+      </span>
+    </div>
+
     <div class="hd-brick" id="hdBrick" hidden></div>
 
     <!-- Pix aprovado na hora não existe: o pagamento nasce pendente e o QR
